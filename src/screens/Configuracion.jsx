@@ -584,9 +584,44 @@ const Configuracion = ({ kiosco }) => {
               </div>
             )}
 
-            {updateState.status === UPDATE_STATUS.AVAILABLE && (
-              <div style={{ fontSize: '13px', color: 'var(--color-primary)', marginBottom: '14px' }}>
-                ⏳ Descargando nueva versión en segundo plano...
+            {(updateState.status === UPDATE_STATUS.AVAILABLE || updateState.status === UPDATE_STATUS.DOWNLOADING) && (
+              <div style={{ padding: '12px 14px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#1d4ed8' }}>
+                    ⏳ Descargando actualización en segundo plano...
+                  </span>
+                  {updateState.progress?.percent && (
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#1d4ed8' }}>
+                      {Math.round(updateState.progress.percent)}%
+                    </span>
+                  )}
+                </div>
+                {updateState.progress?.total > 0 && (
+                  <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '6px' }}>
+                    <div 
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, updateState.progress.percent || 0))}%`, 
+                        height: '100%', 
+                        background: '#2563eb', 
+                        transition: 'width 0.3s ease' 
+                      }} 
+                    />
+                  </div>
+                )}
+                {updateState.progress?.total > 0 && (
+                  <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{(updateState.progress.transferred / 1024 / 1024).toFixed(1)} MB de {(updateState.progress.total / 1024 / 1024).toFixed(1)} MB</span>
+                    {updateState.progress?.bytesPerSecond > 0 && (
+                      <span>{(updateState.progress.bytesPerSecond / 1024 / 1024).toFixed(1)} MB/s</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {updateState.status === UPDATE_STATUS.ERROR && (
+              <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '10px', marginBottom: '14px', color: '#b91c1c', fontSize: '12.5px' }}>
+                ⚠️ No se pudo completar la actualización: {typeof updateState.error === 'string' ? updateState.error : 'Error de descarga'}. Revisa tu conexión a internet o intenta nuevamente.
               </div>
             )}
 

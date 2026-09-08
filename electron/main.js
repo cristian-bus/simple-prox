@@ -40,6 +40,17 @@ function createWindow() {
     }
   });
 
+  autoUpdater.on('download-progress', (progressObj) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-download-progress', {
+        percent: progressObj.percent,
+        bytesPerSecond: progressObj.bytesPerSecond,
+        transferred: progressObj.transferred,
+        total: progressObj.total
+      });
+    }
+  });
+
   autoUpdater.on('update-downloaded', (info) => {
     if (win && !win.isDestroyed()) {
       win.webContents.send('update-downloaded', {

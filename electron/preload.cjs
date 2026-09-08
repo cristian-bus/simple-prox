@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('update-available', handler);
     return () => ipcRenderer.removeListener('update-available', handler);
   },
+  onUpdateDownloadProgress: (callback) => {
+    const handler = (event, progress) => callback(progress);
+    ipcRenderer.on('update-download-progress', handler);
+    return () => ipcRenderer.removeListener('update-download-progress', handler);
+  },
   onUpdateDownloaded: (callback) => {
     const handler = (event, info) => callback(info);
     ipcRenderer.on('update-downloaded', handler);

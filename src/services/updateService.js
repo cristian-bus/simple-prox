@@ -13,6 +13,7 @@ export const UPDATE_STATUS = {
 let currentUpdateState = {
   status: UPDATE_STATUS.IDLE,
   updateInfo: null,
+  progress: null,
   error: null
 };
 
@@ -80,6 +81,18 @@ if (typeof window !== 'undefined' && window.api) {
       };
       notifyListeners();
       console.log('[UpdateService] Nueva versión disponible:', info?.version);
+    });
+  }
+
+  if (window.api.onUpdateDownloadProgress) {
+    window.api.onUpdateDownloadProgress((progress) => {
+      currentUpdateState = {
+        ...currentUpdateState,
+        status: UPDATE_STATUS.DOWNLOADING,
+        progress: progress,
+        error: null
+      };
+      notifyListeners();
     });
   }
 
