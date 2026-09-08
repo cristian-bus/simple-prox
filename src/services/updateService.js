@@ -7,6 +7,7 @@ export const UPDATE_STATUS = {
   AVAILABLE: 'AVAILABLE',
   DOWNLOADING: 'DOWNLOADING',
   READY_TO_INSTALL: 'READY_TO_INSTALL',
+  UP_TO_DATE: 'UP_TO_DATE',
   ERROR: 'ERROR'
 };
 
@@ -37,11 +38,14 @@ export function subscribeUpdate(listener) {
   return () => listeners.delete(listener);
 }
 
+let checkTimeout = null;
+
 /**
  * Solicita comprobar actualizaciones manualmente
  */
 export function checkForUpdatesManual() {
   if (window.api?.checkForUpdates) {
+    if (checkTimeout) clearTimeout(checkTimeout);
     currentUpdateState = {
       ...currentUpdateState,
       status: UPDATE_STATUS.CHECKING,
@@ -49,6 +53,18 @@ export function checkForUpdatesManual() {
     };
     notifyListeners();
     window.api.checkForUpdates();
+
+    // Timeout de seguridad: si pasaron 12s sin respuesta, volver a UP_TO_DATE o IDLE
+    checkTimeout = setTimeout(() => {
+      if (currentUpdateState.status === UPDATE_STATUS.CHECKING) {
+        currentUpdateState = {
+          ...currentUpdateState,
+          status: UPDATE_STATUS.UP_TO_DATE,
+          error: null
+        };
+        notifyListeners();
+      }
+    }, 12000);
   }
 }
 
@@ -81,6 +97,20 @@ if (typeof window !== 'undefined' && window.api) {
       };
       notifyListeners();
       console.log('[UpdateService] Nueva versión disponible:', info?.version);
+    });
+  }
+
+  if (window.api.onUpdateNotAvailable) {
+    window.api.onUpdateNotAvailable((info) => {
+      if (checkTimeout) clearTimeout(checkTimeout);
+      currentUpdateState = {
+        ...currentUpdateState,
+        status: UPDATE_STATUS.UP_TO_DATE,
+        updateInfo: info,
+        error: null
+      };
+      notifyListeners();
+      console.log('[UpdateService] El sistema ya está actualizado a la última versión.');
     });
   }
 

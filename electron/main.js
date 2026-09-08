@@ -40,6 +40,14 @@ function createWindow() {
     }
   });
 
+  autoUpdater.on('update-not-available', (info) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-not-available', {
+        version: info?.version
+      });
+    }
+  });
+
   autoUpdater.on('download-progress', (progressObj) => {
     if (win && !win.isDestroyed()) {
       win.webContents.send('update-download-progress', {
@@ -112,7 +120,18 @@ function createWindow() {
 
   ipcMain.on('check-for-updates', () => {
     if (process.env.NODE_ENV !== 'development') {
-      autoUpdater.checkForUpdates().catch(e => console.warn('[Main] Error manual check updates:', e));
+      autoUpdater.checkForUpdates().catch(e => {
+        console.warn('[Main] Error manual check updates:', e);
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('update-error', e?.message || 'Error al comprobar actualizaciones');
+        }
+      });
+    } else {
+      setTimeout(() => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('update-not-available', { version: app.getVersion() });
+        }
+      }, 1000);
     }
   });
 

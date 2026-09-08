@@ -619,6 +619,12 @@ const Configuracion = ({ kiosco }) => {
               </div>
             )}
 
+            {updateState.status === UPDATE_STATUS.UP_TO_DATE && (
+              <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', marginBottom: '14px', color: '#047857', fontSize: '12.5px', fontWeight: 600 }}>
+                ✅ El sistema ya cuenta con la versión más reciente instalada.
+              </div>
+            )}
+
             {updateState.status === UPDATE_STATUS.ERROR && (
               <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '10px', marginBottom: '14px', color: '#b91c1c', fontSize: '12.5px' }}>
                 ⚠️ No se pudo completar la actualización: {typeof updateState.error === 'string' ? updateState.error : 'Error de descarga'}. Revisa tu conexión a internet o intenta nuevamente.
