@@ -1,0 +1,92 @@
+[
+  {
+    "id": "dist-mac",
+    "name": "Distribuidora MAC",
+    "whatsappNumber": "5491144332211",
+    "category": "Almacén",
+    "provinceCode": "ALL",
+    "city": "Nacional",
+    "minPurchase": 50000,
+    "conditions": "Envío sin cargo en compras superiores a $80.000. Entrega en 24/48hs."
+  },
+  {
+    "id": "dist-central-sl",
+    "name": "Distribuidora Central San Luis",
+    "whatsappNumber": "5492664001122",
+    "category": "Bebidas",
+    "provinceCode": "AR-D",
+    "city": "San Luis Capital",
+    "minPurchase": 30000,
+    "conditions": "Reparto de lunes a viernes. Pago contra entrega o transferencia."
+  },
+  {
+    "id": "dist-el-triunfo",
+    "name": "Mayorista El Triunfo",
+    "whatsappNumber": "5492664003344",
+    "category": "Snacks",
+    "provinceCode": "AR-D",
+    "city": "San Luis Capital",
+    "minPurchase": 25000,
+    "conditions": "Mínimo 5 bultos cerrados. Envíos en San Luis."
+  },
+  {
+    "id": "dist-arcor-oficial",
+    "name": "Distribuidora Arcor Oficial",
+    "whatsappNumber": "5492664005566",
+    "category": "Golosinas",
+    "provinceCode": "AR-D",
+    "city": "San Luis Capital",
+    "minPurchase": 40000,
+    "conditions": "Distribución directa de fábrica con garantía de fecha de vencimiento."
+  },
+  {
+    "id": "dist-coca-femsa",
+    "name": "Coca-Cola FEMSA B2B",
+    "whatsappNumber": "5491166554433",
+    "category": "Bebidas",
+    "provinceCode": "ALL",
+    "city": "Nacional",
+    "minPurchase": 60000,
+    "conditions": "Canal oficial para comercios minoristas. Factura A y B."
+  },
+  {
+    "id": "dist-quilmes",
+    "name": "Quilmes Directo",
+    "whatsappNumber": "5491155443322",
+    "category": "Bebidas",
+    "provinceCode": "ALL",
+    "city": "Nacional",
+    "minPurchase": 45000,
+    "conditions": "Llegada semanal con preventista asignado."
+  },
+  {
+    "id": "dist-golomax",
+    "name": "Mayorista Golomax",
+    "whatsappNumber": "5491177665544",
+    "category": "Golosinas",
+    "provinceCode": "ALL",
+    "city": "Nacional",
+    "minPurchase": 20000,
+    "conditions": "Especialistas en golosinas importadas y nacionales."
+  },
+  {
+    "id": "dist-ledesma",
+    "name": "Ledesma Papel & Almacén",
+    "whatsappNumber": "5491188776655",
+    "category": "Almacén",
+    "provinceCode": "ALL",
+    "city": "Nacional",
+    "minPurchase": 35000,
+    "conditions": "Precios por bulto cerrado de resmas y azúcar."
+  },
+  {
+    "id": "dist-limpieza-total",
+    "name": "Distribuidora Limpieza Total",
+    "whatsappNumber": "5491199887766",
+    "category": "Limpieza",
+    "provinceCode": "ALL",
+    "city": "Nacional",
+    "minPurchase": 25000,
+    "conditions": "Productos concentrados y descartables gastronómicos."
+  }
+]

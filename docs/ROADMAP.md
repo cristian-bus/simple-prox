@@ -1,0 +1,48 @@
+# ROADMAP KioscoProX
+
+- [x] FASE 0: Auditoría
+- [x] FASE 1: Estabilización del proyecto
+- [x] FASE 2: Arquitectura del sistema de ofertas
+- [x] FASE 3: Backend/API
+- [x] FASE 4: Panel administrador
+- [x] FASE 5: Integración Electron
+- [x] FASE 6: Caché y funcionamiento offline
+- [x] FASE 7: Métricas (Sincronización y filtros por periodo completados)
+- [x] FASE 8: WhatsApp / CTA (Mensaje dinámico contextual implementado)
+- [x] FASE 9: Pruebas (Validación matemática y ciclo de vida de campañas)
+- [x] FASE 10: MVP comercial
+  - [x] Reportes exportables a CSV (con compatibilidad Excel BOM UTF-8)
+  - [x] Reporte imprimible / PDF con layout limpio en panel admin
+  - [x] Regla de licenciamiento: Kioscos Plan Básico con anuncios obligatorios y Plan Pro con toggle opcional para ocultar publicidad
+  - [x] Ciclo de vida unificado: Finalizadas y Reactivación en panel admin y kiosco
+  - [x] Corrección de paginación Supabase PostgREST (>1000 eventos) con métricas reales
+- [x] FASE 11: Evolución B2B (Fase inicial - Opciones A, B y C)
+  - [x] Pestañas selectoras en pantalla de Ofertas (`Promociones` vs `Mayoristas y Catálogos`)
+  - [x] Directorio unificado de distribuidores (`b2b_distributors.json` + campañas activas)
+  - [x] Acceso 1-clic a catálogo exclusivo por mayorista con botón de retorno contextual
+  - [x] Contacto directo por WhatsApp con plantilla de consulta de catálogo comercial
+  - [x] Paso B: Integración inteligente de ofertas con stock mínimo
+    - Motor de vinculación semántica `stockOfferMatcher.js` (keywords + normalización + categorías)
+    - Banner de sugerencia de reposición rápida en Punto de Venta (con botón Ver Oferta, Pedir WhatsApp y Descartar)
+    - Sugerencias de reposición en el modal de Alertas de Stock del POS
+    - Widget "Con Oferta B2B" y botón "Reponer B2B" en el Control de Inventario
+    - Chip de filtrado rápido "🚨 Reposición Stock" en la pantalla de Ofertas
+  - [x] Paso C: Pedido multiproducto por WhatsApp con carrito consolidado
+    - Carrito B2B independiente (`b2bCart`) persistente en localStorage
+    - Formateador y agrupador por mayorista `b2bOrderFormatter.js`
+    - Modal de pedido mayorista `B2BCartModal.jsx` con control visual de compra mínima
+    - Botón "+ Agregar Pedido", selector de cantidad en tarjeta y modal de detalle
+    - Generación de mensaje consolidado para WhatsApp con desglose de productos y datos del comercio
+- [x] FASE 12: Arquitectura de Instalación Masiva, Identidad, Geolocalización, Remote Config y AutoUpdate
+  - [x] Identidad de terminal (`installationId`) inmutable para preservar licencias activas + `commerceId` para multi-terminal
+  - [x] Catálogo geográfico offline normalizado de Argentina (24 provincias ISO + principales localidades)
+  - [x] Onboarding en 3 pasos con selección geográfica sin llamadas de red obligatorias
+  - [x] Pantalla de Configuración con editor de ubicación, monitor de conectividad activa y chequeo de actualizaciones
+  - [x] Monitor de conectividad real (`connectivityService`) mediante ping HTTP a Supabase
+  - [x] Cola Outbox persistente (`syncService`) con reintentos exponenciales, idempotencia y heartbeat cada 30 min
+  - [x] Sistema de Remote Config seguro (`remoteConfigService`) con caché local y validación de esquema
+  - [x] AutoUpdate en segundo plano con `electron-updater` e inhibición de reinicio si la caja está abierta (`caja.isOpen`)
+  - [x] Matching geográfico de campañas B2B (`b2bUtils.js` + `useOfertas.js`)
+  - [x] Actualización del Panel Administrador con columnas de ubicación, estado, versión y filtros avanzados
+  - [x] Documentación técnica completa (`ARCHITECTURE.md`, `INSTALLATION.md`, `SYNC.md`, `REMOTE_CONFIG.md`, `AUTO_UPDATE.md`)
+
