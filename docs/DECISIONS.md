@@ -357,3 +357,24 @@
   - Script de pruebas `scratch/verify_architecture.mjs`: 14/14 pruebas pasadas (geografía, determinismo de licencias de terminales reales, matching B2B y remote config).
   - Compilación `npm run build`: 1778 módulos en 9.59s, 0 errores.
 - **Resultado**: Aplicación lista para despliegue masivo en comercios físicos, con auto-actualización protegida, configuración remota dinámica, targeting geográfico B2B y cero regresiones en el POS offline.
+
+## 2026-09-08 (Integración GitHub, Servidor MCP y Hosting de Releases)
+- **Fase**: FASE 12 - Infraestructura y Distribución
+- **Problema**: 
+  1. El instalador ejecutable `.exe` (`Simple ProX Setup 1.3.2.exe`, ~197 MB) excedía el límite de 50 MB por objeto de la capa gratuita de Supabase Storage.
+  2. Necesidad de automatizar la distribución, control de versiones y publicación de releases sin requerir tokens secretos embebidos en el cliente Electron.
+- **Solución**:
+  1. Se configuró el servidor MCP oficial `@modelcontextprotocol/server-github` en `~/.gemini/config/mcp_config.json` con autenticación mediante PAT de la cuenta `@cristian-bus`.
+  2. Se creó el repositorio público oficial en GitHub: `https://github.com/cristian-bus/simple-prox`.
+  3. Se inicializó Git en el proyecto local, excluyendo archivos compilados pesados en `.gitignore` (`release/`, `scratch/`, `*.exe`).
+  4. Se actualizó la configuración de `publish` en `package.json` hacia el proveedor nativo `github` (`owner: cristian-bus`, `repo: simple-prox`).
+  5. Se publicó la primera Release oficial `v1.3.2` en GitHub con sus 3 artefactos: `Simple.ProX.Setup.1.3.2.exe`, `Simple.ProX.Setup.1.3.2.exe.blockmap` y `latest.yml`.
+  6. Se verificó la disponibilidad pública de descarga directa sin autenticación (HTTP 200).
+- **Archivos modificados**:
+  - `package.json`
+  - `.gitignore`
+  - `docs/AUTO_UPDATE.md`
+  - `docs/DECISIONS.md`
+  - `~/.gemini/config/mcp_config.json`
+- **Resultado**: Canal de AutoUpdate completamente operativo, gratuito y robusto con hosting de alta disponibilidad en GitHub Releases.
+

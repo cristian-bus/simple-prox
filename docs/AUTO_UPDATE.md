@@ -2,14 +2,15 @@
 
 ## 1. Arquitectura de Distribución
 
-Simple ProX utiliza `electron-updater` con el proveedor `generic`:
+Simple ProX utiliza `electron-updater` con el proveedor oficial de GitHub Releases:
 
 - **Canal de Publicación**:
   ```json
   "publish": [
     {
-      "provider": "generic",
-      "url": "https://qtixbiikhvhzwshfgyeo.supabase.co/storage/v1/object/public/releases/"
+      "provider": "github",
+      "owner": "cristian-bus",
+      "repo": "simple-prox"
     }
   ]
   ```
