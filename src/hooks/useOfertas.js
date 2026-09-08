@@ -53,7 +53,7 @@ export function useOfertas(kiosco) {
       address: commerceProfile.address || businessConfig.address || '',
       phone: commerceProfile.phone || businessConfig.phone || '',
       installer: commerceProfile.installer || '',
-      appVersion: "1.3.1",
+      appVersion: APP_VERSION,
       city
     }).catch(() => {});
   }, [merchantId, effectiveStoreName, businessConfig.plan]);

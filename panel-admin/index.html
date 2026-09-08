@@ -2876,9 +2876,9 @@
             ? '<a href="https://api.whatsapp.com/send?phone=' + cleanPhone + '" target="_blank" style="color: #10b981; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">📱 ' + m.phone + '</a>' 
             : '<span style="color: var(--text-muted);">-</span>';
 
-          const LATEST_APP_VERSION = '1.3.3';
+          const LATEST_APP_VERSION = '1.3.4';
           const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-          const isUpToDate = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.3';
+          const isUpToDate = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.4';
           const versionBadge = isUpToDate
             ? `<span style="background: rgba(16, 185, 129, 0.12); color: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">${verStr}</span>`
             : `<span style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;" title="Instalación con versión previa (${verStr}) - Requiere v${LATEST_APP_VERSION}">${verStr} ⚠️</span>`;

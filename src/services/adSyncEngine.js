@@ -257,8 +257,7 @@ export async function registerMerchantRemotely(merchantInfo = {}) {
     || localActivation?.ip 
     || '';
 
-  const candidateVersion = merchantInfo?.appVersion || savedRegistration?.appVersion || APP_VERSION;
-  const mAppVersion = (candidateVersion && candidateVersion >= APP_VERSION) ? candidateVersion : APP_VERSION;
+  const mAppVersion = APP_VERSION;
 
   // Guardar en caché local persistente para que nunca se pierda
   const completeMerchantInfo = {

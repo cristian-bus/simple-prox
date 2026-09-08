@@ -183,7 +183,7 @@ export async function flushOutbox() {
             phone: item.payload.phone,
             installer: item.payload.installer,
             business_type: item.payload.businessType,
-            app_version: (item.payload.appVersion && item.payload.appVersion >= APP_VERSION) ? item.payload.appVersion : APP_VERSION,
+            app_version: APP_VERSION,
             status: item.payload.status || 'active',
             last_active: new Date().toISOString(),
             last_seen_at: new Date().toISOString(),
@@ -259,7 +259,7 @@ export function sendHeartbeat() {
     enqueueOutbox('HEARTBEAT', {
       installationId: profile.installationId,
       commerceId: profile.commerceId,
-      appVersion: profile.appVersion || '1.3.1',
+      appVersion: APP_VERSION,
       lastSeenAt: new Date().toISOString(),
       configVersion: profile.configVersion || '1.0.0',
       status: profile.status || 'active'

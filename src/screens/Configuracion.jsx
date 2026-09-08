@@ -200,7 +200,7 @@ const Configuracion = ({ kiosco }) => {
       city: businessData.cityName,
       plan: kiosco.businessConfig?.plan || 'Básico',
       installer: kiosco.businessConfig?.activationData?.instalador || '',
-      appVersion: '1.3.1'
+      appVersion: APP_VERSION
     }).catch(() => {});
 
     setShowBusinessSuccess(true);
@@ -557,7 +557,7 @@ const Configuracion = ({ kiosco }) => {
             </div>
             
             <p className="card-subtitle" style={{ marginBottom: '16px' }}>
-              Versión instalada: <strong>v{profile.appVersion || '1.3.1'}</strong> (Canal Estable)
+              Versión instalada: <strong>v{profile.appVersion || APP_VERSION}</strong> (Canal Estable)
             </p>
 
             {updateState.status === UPDATE_STATUS.READY_TO_INSTALL && (

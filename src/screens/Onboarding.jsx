@@ -4,6 +4,7 @@ import { Store, ShoppingBag, Scissors, Heart, CheckCircle2, ChevronRight, ArrowR
 import { registerMerchantRemotely } from '../services/adSyncEngine';
 import { ARGENTINA_PROVINCES, getCitiesForProvince } from '../utils/argentinaGeo';
 import { getCommerceProfile, saveCommerceProfile } from '../services/installationService';
+import { APP_VERSION } from '../constants/version';
 
 const ICONS = {
   kiosco: <Store size={32} />,
@@ -103,7 +104,7 @@ export default function Onboarding({ kiosco }) {
           address: kiosco.businessConfig?.address || initialProfile.address || '',
           phone: kiosco.businessConfig?.phone || initialProfile.phone || '',
           installer: initialProfile.installer || '',
-          appVersion: '1.3.1'
+          appVersion: APP_VERSION
         }).catch(() => {});
       }
     }, 16);
