@@ -413,6 +413,31 @@
       border-color: rgba(255, 255, 255, 0.3);
     }
 
+    .geo-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .geo-chip:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+
+    .geo-chip b {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
     .form-control {
       box-sizing: border-box;
       background-color: #0f172a;
@@ -1040,7 +1065,7 @@
           </div>
 
           <!-- Barra de Filtros y Búsqueda -->
-          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
+          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
               <div style="position: relative; width: 220px; flex-shrink: 0;">
                 <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
@@ -1056,6 +1081,20 @@
                 <button class="filter-pill" onclick="setMerchantFilter('outdated', this)">⚠️ Versión Previa <span class="pill-count" id="count-merchants-outdated">0</span></button>
               </div>
             </div>
+
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <select id="filter-merchant-province" class="form-control" style="width: 175px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="handleMerchantProvinceChange()">
+                <option value="all">Todas las provincias</option>
+              </select>
+              <select id="filter-merchant-city" class="form-control" style="width: 165px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="filterMerchants()">
+                <option value="all">Todas las ciudades</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Resumen Geográfico en Vivo (Provincias y Ciudades) -->
+          <div id="merchants-geo-summary" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px;">
+            <!-- Renderizado dinámico -->
           </div>
 
           <div class="table-container">
@@ -2896,6 +2935,7 @@
               });
               if (mRes.ok) {
                 merchantsList = await mRes.json();
+                populateMerchantGeoOptions();
                 filterMerchants();
               }
             } catch(e) {}
@@ -2926,11 +2966,127 @@
         });
         if (res.ok) {
           merchantsList = await res.json();
+          populateMerchantGeoOptions();
           filterMerchants();
         }
       } catch (err) {
         console.warn('Error al cargar comercios de Supabase:', err);
       }
+    }
+
+    function populateMerchantGeoOptions() {
+      const provSelect = document.getElementById('filter-merchant-province');
+      const geoSummary = document.getElementById('merchants-geo-summary');
+      if (!provSelect) return;
+
+      const currentProv = provSelect.value || 'all';
+
+      // Agrupación geográfica
+      const geoMap = {};
+      let noGeoCount = 0;
+
+      merchantsList.forEach(m => {
+        const provName = (m.province_name && m.province_name.trim()) ? m.province_name.trim() : (m.province_code ? m.province_code.trim() : null);
+        const cityName = (m.city_name && m.city_name.trim()) ? m.city_name.trim() : ((m.city && m.city.trim() && m.city.toLowerCase() !== 'argentina') ? m.city.trim() : null);
+
+        if (!provName) {
+          noGeoCount++;
+          return;
+        }
+
+        if (!geoMap[provName]) {
+          geoMap[provName] = { count: 0, cities: {} };
+        }
+        geoMap[provName].count++;
+
+        const cityKey = cityName || 'Sin ciudad especificada';
+        geoMap[provName].cities[cityKey] = (geoMap[provName].cities[cityKey] || 0) + 1;
+      });
+
+      // Llenar select de provincias
+      provSelect.innerHTML = '<option value="all">Todas las provincias</option>';
+      Object.keys(geoMap).sort().forEach(pName => {
+        const opt = document.createElement('option');
+        opt.value = pName;
+        opt.textContent = `📍 ${pName} (${geoMap[pName].count})`;
+        provSelect.appendChild(opt);
+      });
+      if (noGeoCount > 0) {
+        const optNo = document.createElement('option');
+        optNo.value = '__none__';
+        optNo.textContent = `📍 Sin provincia (${noGeoCount})`;
+        provSelect.appendChild(optNo);
+      }
+      provSelect.value = currentProv;
+      if (provSelect.selectedIndex === -1) provSelect.value = 'all';
+
+      populateMerchantCityOptions();
+
+      // Renderizar resumen geográfico interactivo
+      if (geoSummary) {
+        let summaryHtml = '<span style="font-size: 12px; font-weight: 700; color: #94a3b8; display: inline-flex; align-items: center; gap: 6px;"><i data-lucide="map-pin" style="width: 14px; height: 14px; color: #38bdf8;"></i> Distribución:</span>';
+        
+        Object.keys(geoMap).sort().forEach(pName => {
+          const pData = geoMap[pName];
+          const citiesDetail = Object.entries(pData.cities).map(([c, count]) => `${c}: ${count}`).join(', ');
+          summaryHtml += `<div class="geo-chip" onclick="quickFilterMerchantGeo('${pName}', 'all')" title="${citiesDetail}"><b>${pName}:</b> ${pData.count} <span style="color:#94a3b8; font-size:11px;">(${citiesDetail})</span></div>`;
+        });
+
+        if (noGeoCount > 0) {
+          summaryHtml += `<div class="geo-chip" onclick="quickFilterMerchantGeo('__none__', 'all')" title="Comercios con registros previos o sin provincia indicada"><b>Otras / Sin prov:</b> ${noGeoCount}</div>`;
+        }
+
+        geoSummary.innerHTML = summaryHtml;
+        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+      }
+    }
+
+    function populateMerchantCityOptions() {
+      const provSelect = document.getElementById('filter-merchant-province');
+      const citySelect = document.getElementById('filter-merchant-city');
+      if (!citySelect) return;
+
+      const currentCity = citySelect.value || 'all';
+      const selProv = provSelect ? provSelect.value : 'all';
+
+      const citiesMap = new Map();
+
+      merchantsList.forEach(m => {
+        const provName = (m.province_name && m.province_name.trim()) ? m.province_name.trim() : (m.province_code ? m.province_code.trim() : null);
+        const isNone = !provName;
+
+        if (selProv === '__none__' && !isNone) return;
+        if (selProv !== 'all' && selProv !== '__none__' && provName !== selProv) return;
+
+        const cityName = (m.city_name && m.city_name.trim()) ? m.city_name.trim() : ((m.city && m.city.trim() && m.city.toLowerCase() !== 'argentina') ? m.city.trim() : null);
+        const cityKey = cityName || (isNone ? 'Sin especificar' : 'Otras localidades');
+        citiesMap.set(cityKey, (citiesMap.get(cityKey) || 0) + 1);
+      });
+
+      citySelect.innerHTML = '<option value="all">Todas las ciudades</option>';
+      Array.from(citiesMap.keys()).sort().forEach(cName => {
+        const opt = document.createElement('option');
+        opt.value = cName;
+        opt.textContent = `🏙️ ${cName} (${citiesMap.get(cName)})`;
+        citySelect.appendChild(opt);
+      });
+
+      citySelect.value = currentCity;
+      if (citySelect.selectedIndex === -1) citySelect.value = 'all';
+    }
+
+    function handleMerchantProvinceChange() {
+      populateMerchantCityOptions();
+      filterMerchants();
+    }
+
+    function quickFilterMerchantGeo(prov, city = 'all') {
+      const provSelect = document.getElementById('filter-merchant-province');
+      if (provSelect) provSelect.value = prov;
+      populateMerchantCityOptions();
+      const citySelect = document.getElementById('filter-merchant-city');
+      if (citySelect && city !== 'all') citySelect.value = city;
+      filterMerchants();
     }
 
     let currentMerchantFilter = 'all';
@@ -2978,6 +3134,8 @@
       if (elMOut) elMOut.innerText = mCounts.outdated;
 
       const query = (document.getElementById('merchant-search-input')?.value || '').toLowerCase().trim();
+      const provFilter = document.getElementById('filter-merchant-province')?.value || 'all';
+      const cityFilter = document.getElementById('filter-merchant-city')?.value || 'all';
 
       const filtered = merchantsList.filter(m => {
         const isAct = (m.status || 'active') === 'active';
@@ -2990,6 +3148,17 @@
         if (currentMerchantFilter === 'basic' && isPro) return false;
         if (currentMerchantFilter === 'updated' && !isUp) return false;
         if (currentMerchantFilter === 'outdated' && isUp) return false;
+
+        const provName = (m.province_name && m.province_name.trim()) ? m.province_name.trim() : (m.province_code ? m.province_code.trim() : null);
+        const cityName = (m.city_name && m.city_name.trim()) ? m.city_name.trim() : ((m.city && m.city.trim() && m.city.toLowerCase() !== 'argentina') ? m.city.trim() : null);
+
+        if (provFilter === '__none__' && provName) return false;
+        if (provFilter !== 'all' && provFilter !== '__none__' && provName !== provFilter) return false;
+
+        if (cityFilter !== 'all') {
+          const effectiveCity = cityName || (!provName ? 'Sin especificar' : 'Otras localidades');
+          if (effectiveCity !== cityFilter) return false;
+        }
 
         if (query) {
           const idMatch = (m.id || '').toLowerCase().includes(query);
@@ -3096,8 +3265,8 @@
             ? '<span class="badge" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; font-weight: 700; padding: 3px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35); font-size: 10.5px; letter-spacing: 0.5px;">PRO ⭐</span>'
             : '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; font-weight: 600; padding: 3px 7px; border-radius: 6px; font-size: 10.5px; border: 1px solid rgba(148, 163, 184, 0.2);">Básico</span>';
 
-          const provStr = m.province_name || m.province_code || 'San Luis';
-          const cityStr = m.city_name || m.city || 'Capital';
+          const provStr = m.province_name || m.province_code || 'Sin especificar';
+          const cityStr = m.city_name || (m.city && m.city.toLowerCase() !== 'argentina' ? m.city : '') || 'Sin especificar';
           const cleanPhone = m.phone ? String(m.phone).replace(/\D/g, '') : '';
           const phoneHtml = cleanPhone 
             ? '<a href="https://api.whatsapp.com/send?phone=' + cleanPhone + '" target="_blank" style="color: #10b981; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">📱 ' + m.phone + '</a>' 
