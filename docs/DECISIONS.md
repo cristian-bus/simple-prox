@@ -378,3 +378,21 @@
   - `~/.gemini/config/mcp_config.json`
 - **Resultado**: Canal de AutoUpdate completamente operativo, gratuito y robusto con hosting de alta disponibilidad en GitHub Releases.
 
+## 2026-09-08 (Notificación Visual No Invasiva en Ventas y Auto-Instalación al Salir)
+- **Fase**: FASE 6 / FASE 9 - UX de Actualizaciones y Robustez
+- **Problema**: 
+  1. Los kiosqueros operan el 99% del tiempo en la pantalla de Ventas (PuntoDeVenta) y prácticamente nunca ingresan a Configuración, por lo que no se enteraban si una actualización ya estaba descargada.
+  2. Si la aplicación nunca cerraba o se cerraba manualmente, no se aplicaba el paquete descargado porque `autoInstallOnAppQuit` estaba desactivado.
+- **Solución**:
+  1. Se creó el componente `UpdateNotificationPill.jsx` que se muestra junto al nombre del negocio en `PuntoDeVenta.jsx` solo cuando una versión nueva se está descargando o ya está lista para instalarse.
+  2. Si hay turno de caja abierto, el modal advierte de forma segura para no interrumpir operaciones de cobro y ofrece la opción de posponer la instalación hasta el cierre de caja.
+  3. Se agregó un indicador verde (badge) en el icono de Configuración de `BottomNav.jsx`.
+  4. Se habilitó `autoUpdater.autoInstallOnAppQuit = true` en `electron/main.js` para que cualquier actualización descargada se instale automáticamente al cerrar la aplicación al final del día.
+  5. Se implementó un ciclo de chequeo periódico cada 4 horas en segundo plano en `electron/main.js`.
+- **Archivos modificados**:
+  - `src/components/UpdateNotificationPill.jsx` (nuevo)
+  - `src/screens/PuntoDeVenta.jsx`
+  - `src/components/BottomNav.jsx`
+  - `electron/main.js`
+  - `docs/DECISIONS.md`
+- **Resultado**: Experiencia de actualización fluida y 100% no invasiva que garantiza que las terminales se mantengan al día sin interrumpir las ventas.
