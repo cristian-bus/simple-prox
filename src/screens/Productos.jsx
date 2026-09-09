@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Filter, Download, Upload, Package, MoreHorizontal, ArrowLeft, Shuffle, Settings, Save, X, Edit2, Trash2, Plus, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Bell, Eye } from 'lucide-react';
+import { Search, Filter, Download, Upload, Package, MoreHorizontal, ArrowLeft, Shuffle, Settings, Save, X, Edit2, Trash2, Plus, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Bell, Eye, ChevronDown, Smile } from 'lucide-react';
 import { NICHES } from '../utils/mockData';
 import * as xlsx from 'xlsx';
 
@@ -84,6 +84,89 @@ const Modal = ({ title, onClose, children, minWidth }) => (
     </div>
   </div>
 );
+
+const CATEGORY_EMOJI_GROUPS = [
+  {
+    group: 'Kiosco & Almacén',
+    emojis: [
+      { emoji: '🚬', label: 'Cigarrillos / Tabaco' },
+      { emoji: '🍬', label: 'Caramelos / Golosinas' },
+      { emoji: '🍫', label: 'Chocolates' },
+      { emoji: '🍿', label: 'Snacks / Papas' },
+      { emoji: '🍪', label: 'Galletitas' },
+      { emoji: '🥐', label: 'Panadería / Facturas' },
+      { emoji: '🍞', label: 'Panificados' },
+      { emoji: '🥪', label: 'Sandwiches / Comidas' },
+      { emoji: '🍕', label: 'Pizzas / Empanadas' },
+      { emoji: '🍔', label: 'Hamburguesas / Fast Food' },
+      { emoji: '🌭', label: 'Panchos' },
+      { emoji: '🍦', label: 'Helados' },
+      { emoji: '🧊', label: 'Hielo' },
+      { emoji: '🥫', label: 'Enlatados / Conservas' },
+      { emoji: '🧂', label: 'Condimentos / Almacén' },
+      { emoji: '🥩', label: 'Fiambres / Carnes' },
+      { emoji: '🧀', label: 'Lácteos / Quesos' },
+      { emoji: '🥚', label: 'Huevos' },
+      { emoji: '🍎', label: 'Frutas / Verduras' },
+      { emoji: '🍝', label: 'Pastas / Fideos' }
+    ]
+  },
+  {
+    group: 'Bebidas & Cafetería',
+    emojis: [
+      { emoji: '🥤', label: 'Gaseosas / Aguas' },
+      { emoji: '🍺', label: 'Cervezas' },
+      { emoji: '🍷', label: 'Vinos' },
+      { emoji: '🍾', label: 'Champagne / Espumantes' },
+      { emoji: '🍸', label: 'Aperitivos / Licores' },
+      { emoji: '🧃', label: 'Jugos' },
+      { emoji: '☕', label: 'Café / Infusiones' },
+      { emoji: '🧉', label: 'Yerba / Mate' }
+    ]
+  },
+  {
+    group: 'Higiene, Limpieza & Otros',
+    emojis: [
+      { emoji: '🧼', label: 'Limpieza' },
+      { emoji: '🧴', label: 'Higiene Personal' },
+      { emoji: '🧻', label: 'Papel Higiénico / Rollos' },
+      { emoji: '💊', label: 'Farmacia / Botiquín' },
+      { emoji: '🧹', label: 'Bazar / Hogar' },
+      { emoji: '📦', label: 'Almacén General / Varios' },
+      { emoji: '✂️', label: 'Librería / Papelería' },
+      { emoji: '🐶', label: 'Mascotas' },
+      { emoji: '🎮', label: 'Juguetes / Entretenimiento' },
+      { emoji: '🔋', label: 'Pilas / Electrónica' },
+      { emoji: '📱', label: 'Accesorios Celulares' },
+      { emoji: '🏷️', label: 'Ofertas / Promociones' },
+      { emoji: '🔥', label: 'Destacados / Lo Más Vendido' },
+      { emoji: '⚡', label: 'Combos' },
+      { emoji: '✨', label: 'Novedades' }
+    ]
+  }
+];
+
+const SUGGESTED_SHORTCUTS = [
+  { emoji: '🚬', name: 'Cigarrillos' },
+  { emoji: '🍬', name: 'Golosinas' },
+  { emoji: '🍫', name: 'Chocolates' },
+  { emoji: '🍿', name: 'Snacks' },
+  { emoji: '🥤', name: 'Bebidas' },
+  { emoji: '🍺', name: 'Cervezas' },
+  { emoji: '🍞', name: 'Panadería' },
+  { emoji: '🧼', name: 'Limpieza' },
+  { emoji: '🧴', name: 'Higiene' }
+];
+
+const parseCategoryName = (catStr) => {
+  if (!catStr) return { emoji: '🏷️', name: '' };
+  // Check if starts with emoji characters
+  const match = catStr.match(/^([\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*(.*)$/u);
+  if (match) {
+    return { emoji: match[1], name: match[2].trim() };
+  }
+  return { emoji: '🏷️', name: catStr.trim() };
+};
 
 const Productos = ({ kiosco }) => {
   const { products, addProduct: saveProduct, updateProduct, deleteProduct, deleteProducts, batchImportProducts, categoryTree, updateCategoryTree, suppliers, setSuppliers, sales = [] } = kiosco;
@@ -386,8 +469,13 @@ const Productos = ({ kiosco }) => {
 
   // Category management states
   const [newCatName, setNewCatName] = useState('');
+  const [selectedEmoji, setSelectedEmoji] = useState('🚬');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiSearch, setEmojiSearch] = useState('');
   const [editingCatName, setEditingCatName] = useState(null);
   const [catEditValue, setCatEditValue] = useState('');
+  const [editingCatEmoji, setEditingCatEmoji] = useState('🏷️');
+  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [selectedCatForSubs, setSelectedCatForSubs] = useState(null);
   const [newSubName, setNewSubName] = useState('');
 
@@ -965,7 +1053,143 @@ const Productos = ({ kiosco }) => {
     if (!showCategoryModal) return null;
     
     const categories = Object.keys(categoryTree);
-    
+
+    const handleAddCategory = () => {
+      const cleanName = newCatName.trim();
+      if (!cleanName) return;
+
+      const { emoji, name } = parseCategoryName(cleanName);
+      const finalEmoji = (emoji && emoji !== '🏷️') ? emoji : selectedEmoji;
+      const finalName = name || cleanName;
+      const fullName = `${finalEmoji} ${finalName}`.trim();
+
+      if (categoryTree[fullName]) {
+        alert("Ya existe una categoría con ese nombre.");
+        return;
+      }
+
+      updateCategoryTree({ ...categoryTree, [fullName]: [] });
+      setNewCatName('');
+      setShowEmojiPicker(false);
+    };
+
+    const handleStartEditCategory = (cat) => {
+      const { emoji, name } = parseCategoryName(cat);
+      setEditingCatName(cat);
+      setEditingCatEmoji(emoji || '🏷️');
+      setCatEditValue(name || cat);
+      setShowEditEmojiPicker(false);
+    };
+
+    const handleSaveEditCategory = (oldCat) => {
+      const cleanName = catEditValue.trim();
+      if (!cleanName) return;
+
+      const { emoji, name } = parseCategoryName(cleanName);
+      const finalEmoji = (emoji && emoji !== '🏷️') ? emoji : editingCatEmoji;
+      const finalName = name || cleanName;
+      const fullName = `${finalEmoji} ${finalName}`.trim();
+
+      if (fullName !== oldCat) {
+        const newTree = { ...categoryTree };
+        newTree[fullName] = newTree[oldCat] || [];
+        delete newTree[oldCat];
+        updateCategoryTree(newTree);
+
+        if (updateProduct && products) {
+          products.filter(p => p.category === oldCat).forEach(p => {
+            updateProduct(p.id, { category: fullName });
+          });
+        }
+      }
+      setEditingCatName(null);
+      setShowEditEmojiPicker(false);
+    };
+
+    const renderEmojiPickerGrid = (onSelectEmoji, currentEmoji, onClose) => {
+      const filterText = emojiSearch.toLowerCase().trim();
+      return (
+        <div style={{
+          marginTop: '10px',
+          padding: '14px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
+          position: 'relative',
+          zIndex: 50
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f36', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Smile size={16} color="#3b82f6" /> Elegir Emoticón / Ícono
+            </span>
+            <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }} title="Cerrar">
+              <X size={16} color="var(--color-text-muted)" />
+            </button>
+          </div>
+
+          <div style={{ position: 'relative', marginBottom: '10px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+            <input
+              type="text"
+              className="input"
+              placeholder="Buscar emoticón (ej: cigarrillos, bebida, dulce...)"
+              value={emojiSearch}
+              onChange={e => setEmojiSearch(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '32px', fontSize: '12px', height: '34px' }}
+            />
+          </div>
+
+          <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
+            {CATEGORY_EMOJI_GROUPS.map(grp => {
+              const matchedEmojis = filterText 
+                ? grp.emojis.filter(item => item.label.toLowerCase().includes(filterText) || item.emoji.includes(filterText))
+                : grp.emojis;
+
+              if (matchedEmojis.length === 0) return null;
+
+              return (
+                <div key={grp.group}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    {grp.group}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                    {matchedEmojis.map(item => (
+                      <button
+                        key={item.emoji + item.label}
+                        type="button"
+                        onClick={() => {
+                          onSelectEmoji(item.emoji);
+                          onClose();
+                        }}
+                        title={item.label}
+                        style={{
+                          height: '38px',
+                          fontSize: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: currentEmoji === item.emoji ? '#e0f2fe' : '#f8fafc',
+                          border: currentEmoji === item.emoji ? '2px solid #38bdf8' : '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.1s, background-color 0.15s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = currentEmoji === item.emoji ? '#e0f2fe' : '#f8fafc'}
+                      >
+                        {item.emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="modal-overlay" onClick={() => setShowCategoryModal(false)} style={{ zIndex: 1000 }}>
         <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '500px', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -994,32 +1218,89 @@ const Productos = ({ kiosco }) => {
           <div style={{ padding: '24px' }}>
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Nueva Categoría Principal</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {/* Botón Selector de Emoticón */}
+                <button 
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '8px 12px',
+                    fontSize: '20px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    minWidth: '60px',
+                    justifyContent: 'center',
+                    boxShadow: showEmojiPicker ? '0 0 0 2px rgba(56, 189, 248, 0.4)' : 'none'
+                  }}
+                  title="Elegir emoticón para la categoría"
+                >
+                  <span>{selectedEmoji}</span>
+                  <ChevronDown size={14} color="var(--color-text-muted)" />
+                </button>
+
                 <input 
                   type="text" 
                   className="input" 
-                  placeholder={kiosco.businessConfig?.businessType === 'petshop' ? "Ej: 🧸 Juguetes" : (kiosco.businessConfig?.businessType === 'libreria' ? "Ej: ✂️ Útiles Escolares" : (kiosco.businessConfig?.businessType === 'barberia' ? "Ej: 🧴 Cosmética Capilar" : "Ej: 🥐 Panadería"))} 
+                  placeholder={kiosco.businessConfig?.businessType === 'petshop' ? "Ej: Juguetes" : (kiosco.businessConfig?.businessType === 'libreria' ? "Ej: Útiles Escolares" : (kiosco.businessConfig?.businessType === 'barberia' ? "Ej: Cosmética Capilar" : "Ej: Cigarrillos o Panadería"))} 
                   value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && newCatName.trim()) {
-                      updateCategoryTree({ ...categoryTree, [newCatName.trim()]: [] });
-                      setNewCatName('');
+                    if (e.key === 'Enter') {
+                      handleAddCategory();
                     }
                   }}
+                  style={{ flex: 1 }}
                 />
                 <button 
                   className="btn btn-primary"
-                  onClick={() => {
-                    if (newCatName.trim()) {
-                      updateCategoryTree({ ...categoryTree, [newCatName.trim()]: [] });
-                      setNewCatName('');
-                    }
-                  }}
+                  onClick={handleAddCategory}
+                  title="Agregar categoría"
                 >
                   <Plus size={18} />
                 </button>
               </div>
+
+              {/* Atajos Rápidos Sugeridos con 1 Clic */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Sugeridos:</span>
+                {SUGGESTED_SHORTCUTS.map(sug => (
+                  <button
+                    key={sug.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedEmoji(sug.emoji);
+                      setNewCatName(sug.name);
+                      setShowEmojiPicker(false);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '11.5px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>{sug.emoji}</span> <span>{sug.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Cuadro Picker Desplegable de Emoticones */}
+              {showEmojiPicker && renderEmojiPickerGrid(
+                (emoji) => setSelectedEmoji(emoji),
+                selectedEmoji,
+                () => setShowEmojiPicker(false)
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1027,51 +1308,67 @@ const Productos = ({ kiosco }) => {
                 <div key={cat} style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
                   <div style={{ padding: '12px 16px', backgroundColor: '#f8f9fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     {editingCatName === cat ? (
-                      <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
-                        <input 
-                          autoFocus
-                          className="input" 
-                          value={catEditValue} 
-                          onChange={e => setCatEditValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              const newName = catEditValue.trim();
-                              if (newName && newName !== cat) {
-                                const newTree = { ...categoryTree };
-                                newTree[newName] = newTree[cat];
-                                delete newTree[cat];
-                                updateCategoryTree(newTree);
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '6px 10px',
+                              fontSize: '18px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid var(--color-border)',
+                              borderRadius: '8px',
+                              cursor: 'pointer'
+                            }}
+                            title="Cambiar emoticón"
+                          >
+                            <span>{editingCatEmoji}</span>
+                            <ChevronDown size={12} color="var(--color-text-muted)" />
+                          </button>
+
+                          <input 
+                            autoFocus
+                            className="input" 
+                            value={catEditValue} 
+                            onChange={e => setCatEditValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                handleSaveEditCategory(cat);
                               }
-                              setEditingCatName(null);
-                            }
-                          }}
-                        />
-                        <button className="btn btn-primary" style={{ backgroundColor: '#28a745', padding: '0 8px' }} onClick={() => {
-                          const newName = catEditValue.trim();
-                          if (newName && newName !== cat) {
-                            const newTree = { ...categoryTree };
-                            newTree[newName] = newTree[cat];
-                            delete newTree[cat];
-                            updateCategoryTree(newTree);
-                          }
-                          setEditingCatName(null);
-                        }}><Save size={16} /></button>
+                            }}
+                            style={{ flex: 1 }}
+                          />
+                          <button className="btn btn-primary" style={{ backgroundColor: '#28a745', padding: '0 10px' }} onClick={() => handleSaveEditCategory(cat)} title="Guardar cambios">
+                            <Save size={16} />
+                          </button>
+                        </div>
+
+                        {showEditEmojiPicker && renderEmojiPickerGrid(
+                          (emoji) => setEditingCatEmoji(emoji),
+                          editingCatEmoji,
+                          () => setShowEditEmojiPicker(false)
+                        )}
                       </div>
                     ) : (
                       <div style={{ fontWeight: 600, fontSize: '15px' }}>{cat}</div>
                     )}
                     
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn-icon" onClick={() => {
-                        setEditingCatName(cat);
-                        setCatEditValue(cat);
-                      }}><Edit2 size={14} /></button>
+                      <button className="btn-icon" onClick={() => handleStartEditCategory(cat)} title="Editar nombre o emoticón">
+                        <Edit2 size={14} />
+                      </button>
                       <button className="btn-icon" style={{ color: '#dc3545' }} onClick={() => {
                         const newTree = { ...categoryTree };
                         delete newTree[cat];
                         updateCategoryTree(newTree);
-                      }}><Trash2 size={14} /></button>
-                      <button className="btn-icon" onClick={() => setSelectedCatForSubs(selectedCatForSubs === cat ? null : cat)}>
+                      }} title="Eliminar categoría">
+                        <Trash2 size={14} />
+                      </button>
+                      <button className="btn-icon" onClick={() => setSelectedCatForSubs(selectedCatForSubs === cat ? null : cat)} title="Gestionar subcategorías">
                         {selectedCatForSubs === cat ? <ChevronLeft size={16} /> : <Plus size={16} />}
                       </button>
                     </div>
