@@ -438,6 +438,106 @@
       font-weight: 700;
     }
 
+    .perf-kpi-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+    .perf-kpi-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(30, 41, 59, 0.7);
+    }
+    .perf-kpi-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .perf-kpi-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .perf-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .perf-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .badge-ctr-high {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .badge-ctr-med {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .badge-ctr-low {
+      background: rgba(148, 163, 184, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #distributor-performance-modal, #distributor-performance-modal * {
+        visibility: visible;
+      }
+      #distributor-performance-modal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+        color: black !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .modal {
+        background: white !important;
+        color: black !important;
+        border: none !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+    }
+
     .form-control {
       box-sizing: border-box;
       background-color: #0f172a;
@@ -1206,6 +1306,7 @@
                   <th>Ubicación</th>
                   <th>WhatsApp</th>
                   <th>Categoría</th>
+                  <th style="text-align: center;">Campañas B2B</th>
                   <th>Compra Mínima</th>
                   <th>Condiciones</th>
                   <th style="text-align: right;">Acciones</th>
@@ -1520,6 +1621,132 @@
           <button type="submit" class="btn btn-success"><i data-lucide="check"></i> Guardar Distribuidor</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL HUB DE RENDIMIENTO Y COMPARATIVA POR MAYORISTA -->
+  <div id="distributor-performance-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 1040px; width: 96%; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+      <!-- Header del Modal -->
+      <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; background: rgba(15, 23, 42, 0.95);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.35)); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; color: #38bdf8;">
+            <i data-lucide="bar-chart-3" style="width: 22px; height: 22px;"></i>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <h3 id="perf-modal-dist-name" style="font-size: 20px; font-weight: 800; color: #ffffff; margin: 0;">Distribuidor</h3>
+              <span id="perf-modal-category-badge" class="badge badge-success">Categoría</span>
+              <span id="perf-modal-geo-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(99, 102, 241, 0.15); color: #a5b4fc; font-weight: 600;">🌐 Nacional</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; font-size: 12px; color: #94a3b8;">
+              <span id="perf-modal-whatsapp-link" style="display: inline-flex; align-items: center; gap: 4px; color: #10b981; font-weight: 600;">📱 -</span>
+              <span>•</span>
+              <span id="perf-modal-conditions-text" style="color: #cbd5e1;">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="no-print" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 11.5px; color: #94a3b8;">Cambiar Mayorista:</label>
+            <select id="perf-modal-switcher" class="form-control" style="width: 200px; height: 34px; font-size: 12px; padding: 4px 8px; border-radius: 8px;" onchange="switchDistributorPerformance(this.value)">
+              <!-- Llenado dinámicamente -->
+            </select>
+          </div>
+
+          <button class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);" onclick="copyCurrentDistributorWhatsAppReport()" title="Copiar reporte formateado para WhatsApp">
+            <i data-lucide="share-2" style="width: 14px; height: 14px;"></i> Copiar para WhatsApp
+          </button>
+
+          <button class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08);" onclick="printDistributorReport()" title="Imprimir / Exportar Reporte">
+            <i data-lucide="printer" style="width: 14px; height: 14px;"></i> Imprimir Reporte
+          </button>
+
+          <button class="btn btn-outline" style="padding: 6px 10px;" onclick="closeDistributorPerformanceModal()" title="Cerrar">
+            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenido scrolleable -->
+      <div style="padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; flex: 1;">
+        <!-- 4 Tarjetas KPI Globales -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px;">
+          <div class="perf-kpi-card">
+            <div class="perf-kpi-label"><i data-lucide="eye" style="width:14px; height:14px; color:#38bdf8;"></i> Impresiones Totales</div>
+            <div class="perf-kpi-value" id="perf-kpi-imp">0</div>
+            <div style="font-size: 11px; color: #94a3b8;">Vistas en pantallas POS</div>
+          </div>
+          <div class="perf-kpi-card">
+            <div class="perf-kpi-label"><i data-lucide="mouse-pointer" style="width:14px; height:14px; color:#818cf8;"></i> Ofertas Abiertas</div>
+            <div class="perf-kpi-value" id="perf-kpi-opens">0</div>
+            <div style="font-size: 11px; color: #94a3b8;">Clics para ver detalles</div>
+          </div>
+          <div class="perf-kpi-card">
+            <div class="perf-kpi-label"><i data-lucide="message-circle" style="width:14px; height:14px; color:#10b981;"></i> Clics WhatsApp</div>
+            <div class="perf-kpi-value" id="perf-kpi-wpp" style="color: #10b981;">0</div>
+            <div style="font-size: 11px; color: #94a3b8;">Pedidos directos iniciados</div>
+          </div>
+          <div class="perf-kpi-card">
+            <div class="perf-kpi-label"><i data-lucide="trending-up" style="width:14px; height:14px; color:#f59e0b;"></i> CTR WhatsApp Global</div>
+            <div class="perf-kpi-value" id="perf-kpi-ctr" style="color: #f59e0b;">0.0%</div>
+            <div style="font-size: 11px; color: #94a3b8;">Conversión clics / vistas</div>
+          </div>
+        </div>
+
+        <!-- Filtros internos y ordenamiento -->
+        <div class="no-print" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div style="position: relative; width: 220px;">
+              <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
+              <input type="text" id="perf-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 34px; font-size: 12px; border-radius: 8px;" placeholder="Buscar en campañas..." oninput="renderDistributorPerformanceTable()">
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <button class="filter-pill active" id="perf-pill-all" onclick="setPerfStatusFilter('all', this)">Todas (<span id="perf-count-all">0</span>)</button>
+              <button class="filter-pill" id="perf-pill-active" onclick="setPerfStatusFilter('active', this)">🟢 Activas (<span id="perf-count-active">0</span>)</button>
+              <button class="filter-pill" id="perf-pill-paused" onclick="setPerfStatusFilter('paused', this)">⏸️ Pausadas (<span id="perf-count-paused">0</span>)</button>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 12px; color: #94a3b8; font-weight: 600;">Ordenar por:</label>
+            <select id="perf-sort-select" class="form-control" style="width: 180px; height: 34px; font-size: 12px; padding: 4px 8px; border-radius: 8px;" onchange="renderDistributorPerformanceTable()">
+              <option value="ctr">Mayor CTR (Efectividad)</option>
+              <option value="whatsapp">Más Clics a WhatsApp</option>
+              <option value="impressions">Más Impresiones</option>
+              <option value="price-desc">Mayor Precio</option>
+              <option value="price-asc">Menor Precio</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tabla comparativa de campañas -->
+        <div class="table-container" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 280px;">Campaña / Oferta B2B</th>
+                <th style="text-align: center; width: 90px;">Estado</th>
+                <th style="text-align: right; width: 95px;">Impresiones</th>
+                <th style="text-align: right; width: 95px;">Vistas Det.</th>
+                <th style="text-align: right; width: 105px;">Clics WhatsApp</th>
+                <th style="text-align: center; width: 100px;">CTR Conversión</th>
+                <th style="width: 140px;">Rendimiento Relativo</th>
+                <th class="no-print" style="text-align: right; width: 120px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="perf-table-body">
+              <!-- Renderizado dinámico -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bloque de Resumen Ejecutivo y Recomendación Comercial -->
+        <div id="perf-executive-insights" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8)); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <!-- Renderizado dinámico de la campaña estrella y sugerencia comercial -->
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2474,6 +2701,10 @@
 
     function closeModal() {
       document.getElementById('campaign-modal').classList.add('hidden');
+      if (window.lastPerformanceDistributorId) {
+        openDistributorPerformanceModal(window.lastPerformanceDistributorId);
+        window.lastPerformanceDistributorId = null;
+      }
     }
 
     function updatePreview() {
@@ -3717,11 +3948,13 @@
         };
         const dProv = d.provinceCode || d.province || 'ALL';
         const geoBadge = provNames[dProv] || (dProv === 'ALL' ? '🌐 Nacional' : `📍 ${dProv}`);
+        const distCamps = getCampaignsForDistributor(d);
+        const distActiveCamps = distCamps.filter(c => computeCampaignStatus(c) === 'active');
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
-            <b style="font-size: 13.5px;">${d.name}</b>
+            <b style="font-size: 13.5px; cursor: pointer; color: #38bdf8;" onclick="openDistributorPerformanceModal('${d.id}')" title="Ver rendimiento de ${d.name}">${d.name}</b>
           </td>
           <td>
             <span style="display:inline-block; padding:3px 8px; border-radius:6px; background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:11.5px; font-weight:600;">${geoBadge}</span>
@@ -3729,11 +3962,21 @@
           </td>
           <td>${d.whatsappNumber || '-'}</td>
           <td><span class="badge badge-success">${d.category || 'General'}</span></td>
+          <td style="text-align: center;">
+            ${distCamps.length > 0 ? `
+              <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-radius: 6px; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); color: #38bdf8;" onclick="openDistributorPerformanceModal('${d.id}')" title="Ver ${distCamps.length} campañas de ${d.name}">
+                🏷️ <b>${distCamps.length}</b> ${distCamps.length === 1 ? 'oferta' : 'ofertas'} <span style="color:#10b981; font-size:10px;">(${distActiveCamps.length} act.)</span>
+              </button>
+            ` : `<span style="font-size: 11.5px; color: var(--text-muted);">0 ofertas</span>`}
+          </td>
           <td>${d.minPurchase ? '$' + Number(d.minPurchase).toLocaleString('es-AR') : 'Sin mínimo'}</td>
           <td style="font-size: 11px; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${d.conditions || '-'}</td>
           <td style="text-align: right;">
             <div style="display: inline-flex; gap: 6px; align-items: center;">
-              <button class="btn btn-outline" style="padding: 5px 9px; font-size: 12px;" onclick="openEditDistributorModal('${d.id}')" title="Editar">
+              <button class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); display: inline-flex; align-items: center; gap: 5px;" onclick="openDistributorPerformanceModal('${d.id}')" title="Ver Rendimiento y Comparativa de Campañas">
+                <i data-lucide="bar-chart-2" style="width:14px; height:14px;"></i> <span style="font-weight:700;">Rendimiento</span>
+              </button>
+              <button class="btn btn-outline" style="padding: 5px 9px; font-size: 12px;" onclick="openEditDistributorModal('${d.id}')" title="Editar datos del mayorista">
                 <i data-lucide="edit-2" style="width:14px; height:14px;"></i>
               </button>
               <button class="btn btn-outline" style="padding: 5px 9px; font-size: 12px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" onclick="confirmDeleteDistributor('${d.id}')" title="Eliminar">
@@ -3745,6 +3988,369 @@
         tbody.appendChild(tr);
       });
       lucide.createIcons();
+    }
+
+    // ==============================================================
+    // HUB DE RENDIMIENTO Y COMPARATIVA POR MAYORISTA (OPCIONES 1 & 3)
+    // ==============================================================
+    let activePerformanceDistributorId = null;
+    let currentPerfStatusFilter = 'all';
+
+    function getCampaignsForDistributor(dist) {
+      if (!dist) return [];
+      const dName = (dist.name || '').trim().toLowerCase();
+      const dId = (dist.id || '').trim().toLowerCase();
+
+      return campaigns.filter(c => {
+        if (c.deleted && c.status !== 'finished') return false;
+        const sName = (c.supplierName || c.supplier_name || '').trim().toLowerCase();
+        const sId = (c.distributor_id || c.distributorId || '').trim().toLowerCase();
+
+        if (dId && sId && sId === dId) return true;
+        if (dName && sName && (sName === dName || sName.includes(dName) || dName.includes(sName))) return true;
+        return false;
+      });
+    }
+
+    function getCampaignMetrics(c) {
+      const myEvs = rawEvents.filter(e => e.campaign_id === c.id || e.campaign_id === c.title);
+      const imp = myEvs.filter(e => e.event_type === 'impression').length;
+      const opens = myEvs.filter(e => e.event_type === 'offer_open').length;
+      const wpp = myEvs.filter(e => e.event_type === 'whatsapp_click').length;
+      const ctr = imp > 0 ? Number(((wpp / imp) * 100).toFixed(1)) : 0;
+      return {
+        impressions: imp,
+        opens,
+        whatsappClicks: wpp,
+        ctr
+      };
+    }
+
+    function openDistributorPerformanceModal(distId) {
+      const dist = distributorsList.find(d => d.id === distId);
+      if (!dist) return;
+
+      activePerformanceDistributorId = dist.id;
+      currentPerfStatusFilter = 'all';
+
+      // Resetear filtro pills
+      document.querySelectorAll('#distributor-performance-modal .filter-pill').forEach(p => p.classList.remove('active'));
+      const pillAll = document.getElementById('perf-pill-all');
+      if (pillAll) pillAll.classList.add('active');
+
+      const searchInp = document.getElementById('perf-search-input');
+      if (searchInp) searchInp.value = '';
+
+      // Datos de cabecera
+      document.getElementById('perf-modal-dist-name').innerText = dist.name;
+      document.getElementById('perf-modal-category-badge').innerText = dist.category || 'General';
+
+      const provNames = {
+        'ALL': '🌐 Nacional', 'AR-X': '📍 Córdoba', 'AR-D': '📍 San Luis', 'AR-B': '📍 Bs. As.',
+        'AR-C': '📍 CABA', 'AR-M': '📍 Mendoza', 'AR-S': '📍 Santa Fe', 'AR-T': '📍 Tucumán',
+        'AR-E': '📍 Entre Ríos', 'AR-W': '📍 Corrientes', 'AR-N': '📍 Misiones', 'AR-H': '📍 Chaco',
+        'AR-P': '📍 Formosa', 'AR-G': '📍 Sgo. del Estero', 'AR-K': '📍 Catamarca', 'AR-F': '📍 La Rioja',
+        'AR-J': '📍 San Juan', 'AR-L': '📍 La Pampa', 'AR-Q': '📍 Neuquén', 'AR-R': '📍 Río Negro',
+        'AR-U': '📍 Chubut', 'AR-Z': '📍 Santa Cruz', 'AR-V': '📍 Tierra del Fuego', 'AR-Y': '📍 Jujuy',
+        'AR-A': '📍 Salta'
+      };
+      const dProv = dist.provinceCode || dist.province || 'ALL';
+      document.getElementById('perf-modal-geo-badge').innerText = (provNames[dProv] || `📍 ${dProv}`) + (dist.city ? ` - ${dist.city}` : '');
+
+      const wppClean = dist.whatsappNumber ? String(dist.whatsappNumber).replace(/\D/g, '') : '';
+      const wppLink = document.getElementById('perf-modal-whatsapp-link');
+      if (wppClean) {
+        wppLink.innerHTML = `<a href="https://api.whatsapp.com/send?phone=${wppClean}" target="_blank" style="color:#10b981; text-decoration:none;">📱 WhatsApp: ${dist.whatsappNumber}</a>`;
+      } else {
+        wppLink.innerHTML = `<span>📱 Sin WhatsApp</span>`;
+      }
+
+      const condEl = document.getElementById('perf-modal-conditions-text');
+      condEl.innerText = dist.conditions || (dist.minPurchase ? `Mínimo: $${Number(dist.minPurchase).toLocaleString('es-AR')}` : 'Sin condiciones especiales');
+
+      // Llenar selector de cambio rápido de mayorista
+      const switcher = document.getElementById('perf-modal-switcher');
+      if (switcher) {
+        switcher.innerHTML = '';
+        distributorsList.filter(d => !d.deleted).forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = d.name;
+          if (d.id === dist.id) opt.selected = true;
+          switcher.appendChild(opt);
+        });
+      }
+
+      renderDistributorPerformanceTable();
+
+      document.getElementById('distributor-performance-modal').classList.remove('hidden');
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    }
+
+    function closeDistributorPerformanceModal() {
+      document.getElementById('distributor-performance-modal').classList.add('hidden');
+      activePerformanceDistributorId = null;
+    }
+
+    function switchDistributorPerformance(distId) {
+      if (distId) openDistributorPerformanceModal(distId);
+    }
+
+    function setPerfStatusFilter(status, btn) {
+      currentPerfStatusFilter = status;
+      document.querySelectorAll('#distributor-performance-modal .filter-pill').forEach(p => p.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderDistributorPerformanceTable();
+    }
+
+    function renderDistributorPerformanceTable() {
+      if (!activePerformanceDistributorId) return;
+      const dist = distributorsList.find(d => d.id === activePerformanceDistributorId);
+      if (!dist) return;
+
+      const myCamp = getCampaignsForDistributor(dist);
+
+      // Calcular KPIs globales
+      let sumImp = 0;
+      let sumOpens = 0;
+      let sumWpp = 0;
+
+      const campWithMetrics = myCamp.map(c => {
+        const m = getCampaignMetrics(c);
+        sumImp += m.impressions;
+        sumOpens += m.opens;
+        sumWpp += m.whatsappClicks;
+        const status = computeCampaignStatus(c);
+        return {
+          ...c,
+          computedStatus: status,
+          metrics: m
+        };
+      });
+
+      const avgCtr = sumImp > 0 ? ((sumWpp / sumImp) * 100).toFixed(1) : '0.0';
+
+      document.getElementById('perf-kpi-imp').innerText = sumImp.toLocaleString('es-AR');
+      document.getElementById('perf-kpi-opens').innerText = sumOpens.toLocaleString('es-AR');
+      document.getElementById('perf-kpi-wpp').innerText = sumWpp.toLocaleString('es-AR');
+      document.getElementById('perf-kpi-ctr').innerText = `${avgCtr}%`;
+
+      // Actualizar contadores de las pills
+      const countAll = campWithMetrics.length;
+      const countAct = campWithMetrics.filter(c => c.computedStatus === 'active').length;
+      const countPau = campWithMetrics.filter(c => c.computedStatus === 'paused').length;
+
+      document.getElementById('perf-count-all').innerText = countAll;
+      document.getElementById('perf-count-active').innerText = countAct;
+      document.getElementById('perf-count-paused').innerText = countPau;
+
+      // Filtrar y ordenar
+      const query = (document.getElementById('perf-search-input')?.value || '').toLowerCase().trim();
+      const sortBy = document.getElementById('perf-sort-select')?.value || 'ctr';
+
+      let filtered = campWithMetrics.filter(c => {
+        if (currentPerfStatusFilter === 'active' && c.computedStatus !== 'active') return false;
+        if (currentPerfStatusFilter === 'paused' && c.computedStatus !== 'paused') return false;
+
+        if (query) {
+          const matchTitle = (c.title || '').toLowerCase().includes(query);
+          const matchCat = (c.category || '').toLowerCase().includes(query);
+          if (!matchTitle && !matchCat) return false;
+        }
+        return true;
+      });
+
+      // Ordenamiento
+      if (sortBy === 'ctr') {
+        filtered.sort((a, b) => b.metrics.ctr - a.metrics.ctr || b.metrics.whatsappClicks - a.metrics.whatsappClicks);
+      } else if (sortBy === 'whatsapp') {
+        filtered.sort((a, b) => b.metrics.whatsappClicks - a.metrics.whatsappClicks || b.metrics.ctr - a.metrics.ctr);
+      } else if (sortBy === 'impressions') {
+        filtered.sort((a, b) => b.metrics.impressions - a.metrics.impressions);
+      } else if (sortBy === 'price-desc') {
+        filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+      } else if (sortBy === 'price-asc') {
+        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+      }
+
+      // Máximo de CTR para la barra relativa
+      const maxCtr = Math.max(...campWithMetrics.map(c => c.metrics.ctr), 1);
+
+      const tbody = document.getElementById('perf-table-body');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">No se encontraron campañas para este mayorista con los filtros seleccionados.</td></tr>`;
+      } else {
+        filtered.forEach(c => {
+          const statusBadges = {
+            'active': '<span style="color:#10b981; font-weight:700; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;">● Activa</span>',
+            'paused': '<span style="color:#f59e0b; font-weight:700; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;">⏸️ Pausada</span>',
+            'draft': '<span style="color:#94a3b8; font-weight:600; font-size:11.5px;">Borrador</span>',
+            'finished': '<span style="color:#64748b; font-weight:600; font-size:11.5px;">Finalizada</span>'
+          };
+
+          const statusHtml = statusBadges[c.computedStatus] || statusBadges['active'];
+
+          // Badge de CTR
+          let ctrBadgeClass = 'badge-ctr-low';
+          if (c.metrics.ctr >= 8.0) ctrBadgeClass = 'badge-ctr-high';
+          else if (c.metrics.ctr >= 4.0) ctrBadgeClass = 'badge-ctr-med';
+
+          // Porcentaje de barra relativa contra la mejor
+          const relativePercent = Math.min(100, Math.round((c.metrics.ctr / maxCtr) * 100));
+          const barColor = relativePercent >= 75 ? 'linear-gradient(90deg, #10b981, #059669)' : (relativePercent >= 40 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #64748b, #475569)');
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <div style="display:flex; align-items:center; gap:10px;">
+                ${c.imageUrl ? `<img src="${c.imageUrl}" style="width:36px; height:36px; object-fit:cover; border-radius:6px; border:1px solid var(--border); flex-shrink:0;">` : `<div style="width:36px; height:36px; border-radius:6px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; color:#64748b; font-size:10px; flex-shrink:0;">🏷️</div>`}
+                <div style="overflow:hidden;">
+                  <div style="font-weight:700; font-size:13px; color:var(--text); white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" title="${c.title}">${c.title}</div>
+                  <div style="font-size:11px; color:var(--text-muted); display:flex; gap:8px; align-items:center;">
+                    <span style="color:#38bdf8;">${c.category || 'General'}</span>
+                    <span>•</span>
+                    <span style="font-weight:700; color:#10b981;">$${Number(c.price || 0).toLocaleString('es-AR')}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td style="text-align:center;">${statusHtml}</td>
+            <td style="text-align:right; font-weight:600; color:#cbd5e1;">${c.metrics.impressions}</td>
+            <td style="text-align:right; font-weight:600; color:#cbd5e1;">${c.metrics.opens}</td>
+            <td style="text-align:right; font-weight:700; color:#10b981;">${c.metrics.whatsappClicks}</td>
+            <td style="text-align:center;"><span class="${ctrBadgeClass}">${c.metrics.ctr}%</span></td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <div class="perf-bar-bg" style="flex:1;">
+                  <div class="perf-bar-fill" style="width: ${relativePercent}%; background: ${barColor};"></div>
+                </div>
+                <span style="font-size:10.5px; color:#94a3b8; font-weight:600; width:30px; text-align:right;">${relativePercent}%</span>
+              </div>
+            </td>
+            <td class="no-print" style="text-align:right;">
+              <div style="display:inline-flex; gap:4px; align-items:center;">
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11.5px; color:#38bdf8; border-color:rgba(56,189,248,0.3);" onclick="editCampaignFromPerformance('${c.id}')" title="Editar esta campaña">
+                  <i data-lucide="edit-2" style="width:12px; height:12px;"></i> Editar
+                </button>
+                <button class="btn btn-outline" style="padding:4px 6px; font-size:11px; color:${c.computedStatus === 'active' ? '#f59e0b' : '#10b981'};" onclick="toggleStatusFromPerformance('${c.id}')" title="${c.computedStatus === 'active' ? 'Pausar' : 'Activar'}">
+                  <i data-lucide="${c.computedStatus === 'active' ? 'pause' : 'play'}" style="width:12px; height:12px;"></i>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Generar insights automáticos
+      const insightsEl = document.getElementById('perf-executive-insights');
+      if (insightsEl) {
+        if (campWithMetrics.length === 0) {
+          insightsEl.innerHTML = `<span style="font-size:12.5px; color:#94a3b8;">Este distribuidor no tiene campañas cargadas en el catálogo. Puedes crear una nueva campaña en la pestaña "Campañas B2B".</span>`;
+        } else {
+          // Campaña estrella
+          const starCampaign = [...campWithMetrics].sort((a, b) => b.metrics.whatsappClicks - a.metrics.whatsappClicks || b.metrics.ctr - a.metrics.ctr)[0];
+          insightsEl.innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:22px;">🏆</span>
+              <div>
+                <div style="font-size:12px; font-weight:700; color:#ffffff;">Campaña Estrella: <span style="color:#38bdf8;">"${starCampaign.title}"</span></div>
+                <div style="font-size:11.5px; color:#94a3b8;">Logró <b>${starCampaign.metrics.whatsappClicks} pedidos a WhatsApp</b> con un CTR récord de <b>${starCampaign.metrics.ctr}%</b>.</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="btn btn-primary" style="padding:6px 12px; font-size:12px;" onclick="copyCurrentDistributorWhatsAppReport()">
+                <i data-lucide="share-2" style="width:14px; height:14px;"></i> Enviar Balance a Mayorista
+              </button>
+            </div>
+          `;
+        }
+      }
+
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    }
+
+    function editCampaignFromPerformance(campaignId) {
+      window.lastPerformanceDistributorId = activePerformanceDistributorId;
+      document.getElementById('distributor-performance-modal').classList.add('hidden');
+      openEditModal(campaignId);
+    }
+
+    async function toggleStatusFromPerformance(campaignId) {
+      await toggleStatus(campaignId);
+      renderDistributorPerformanceTable();
+    }
+
+    function copyCurrentDistributorWhatsAppReport() {
+      if (!activePerformanceDistributorId) return;
+      copyDistributorWhatsAppReport(activePerformanceDistributorId);
+    }
+
+    function copyDistributorWhatsAppReport(distId) {
+      const dist = distributorsList.find(d => d.id === distId);
+      if (!dist) return;
+      const myCamp = getCampaignsForDistributor(dist);
+
+      let totalImp = 0;
+      let totalOpens = 0;
+      let totalWpp = 0;
+
+      const rows = myCamp.map(c => {
+        const m = getCampaignMetrics(c);
+        totalImp += m.impressions;
+        totalOpens += m.opens;
+        totalWpp += m.whatsappClicks;
+        return { ...c, metrics: m, computedStatus: computeCampaignStatus(c) };
+      });
+
+      const avgCtr = totalImp > 0 ? ((totalWpp / totalImp) * 100).toFixed(1) : '0.0';
+      const today = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+      rows.sort((a, b) => b.metrics.whatsappClicks - a.metrics.whatsappClicks || b.metrics.ctr - a.metrics.ctr);
+
+      let text = `📊 *REPORTE DE RENDIMIENTO B2B - KioscoProX*\n`;
+      text += `🏢 *Mayorista:* ${dist.name}\n`;
+      text += `📅 *Fecha:* ${today}\n`;
+      text += `📍 *Zona:* ${dist.city || 'Nacional'} (${dist.provinceCode || 'ALL'})\n`;
+      text += `-------------------------------------------\n`;
+      text += `📈 *MÉTRICAS GLOBALES ACUMULADAS:*\n`;
+      text += `• 👁️ *Impresiones en Pantallas POS:* ${totalImp.toLocaleString('es-AR')}\n`;
+      text += `• 📂 *Ofertas Vistas en Detalle:* ${totalOpens.toLocaleString('es-AR')}\n`;
+      text += `• 📱 *Pedidos / Clics a WhatsApp:* ${totalWpp.toLocaleString('es-AR')}\n`;
+      text += `• 🎯 *Efectividad / CTR Global:* ${avgCtr}%\n`;
+      text += `• 📦 *Campañas Registradas:* ${myCamp.length}\n`;
+      text += `-------------------------------------------\n`;
+      text += `🏆 *DESGLOSE Y RANKING POR CAMPAÑA:*\n\n`;
+
+      rows.forEach((r, idx) => {
+        const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '▫️'));
+        const statusText = r.computedStatus === 'active' ? '🟢 Activa' : (r.computedStatus === 'paused' ? '⏸️ Pausada' : '⚪ Finalizada');
+        text += `${medal} *${r.title}* (${statusText})\n`;
+        text += `   💲 Precio: $${Number(r.price || 0).toLocaleString('es-AR')}\n`;
+        text += `   👁️ Impresiones: ${r.metrics.impressions} | 📱 Clics WhatsApp: ${r.metrics.whatsappClicks} | 📈 CTR: ${r.metrics.ctr}%\n\n`;
+      });
+
+      text += `-------------------------------------------\n`;
+      text += `✨ *Red de Publicidad y Ofertas Mayoristas KioscoProX*\n`;
+      text += `📲 Contacto directo con comercios y kioscos de la red.`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert(`✅ ¡Reporte copiado al portapapeles!\n\nPuedes pegarlo directamente en WhatsApp Web o enviarlo por chat al mayorista.`);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        alert(`✅ ¡Reporte copiado al portapapeles!`);
+      });
+    }
+
+    function printDistributorReport() {
+      window.print();
     }
 
     function openCreateDistributorModal() {
