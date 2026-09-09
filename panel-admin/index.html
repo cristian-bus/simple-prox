@@ -390,6 +390,29 @@
       border-color: var(--primary);
     }
 
+    .pill-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 12px;
+      margin-left: 6px;
+      min-width: 18px;
+      line-height: 1.4;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.2s ease;
+    }
+
+    .filter-pill.active .pill-count {
+      background: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
     .form-control {
       box-sizing: border-box;
       background-color: #0f172a;
@@ -873,7 +896,13 @@
       <div id="view-campaigns" class="tab-view">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Listado de Campañas y Promociones</h2>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <h2 class="card-title" style="margin: 0;">Listado de Campañas y Promociones</h2>
+              <span id="campaigns-total-badge" style="font-size: 12px; font-weight: 700; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="layers" style="width: 14px; height: 14px; color: #38bdf8;"></i>
+                <span id="campaigns-header-counter">0 campañas</span>
+              </span>
+            </div>
             <div style="display: flex; gap: 10px;">
               <button class="btn btn-outline" onclick="exportJSON()">
                 <i data-lucide="download"></i> Exportar JSON
@@ -890,12 +919,12 @@
               </div>
 
               <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                <button class="filter-pill active" onclick="setCampaignStatusFilter('all', this)">Todas</button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('active', this)">🟢 Activas</button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('scheduled', this)">🟡 Programadas</button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('paused', this)">⏸ Pausadas</button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('finished', this)">🔴 Finalizadas</button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('draft', this)">📝 Borradores</button>
+                <button class="filter-pill active" onclick="setCampaignStatusFilter('all', this)">Todas <span class="pill-count" id="count-campaigns-all">0</span></button>
+                <button class="filter-pill" onclick="setCampaignStatusFilter('active', this)">🟢 Activas <span class="pill-count" id="count-campaigns-active">0</span></button>
+                <button class="filter-pill" onclick="setCampaignStatusFilter('scheduled', this)">🟡 Programadas <span class="pill-count" id="count-campaigns-scheduled">0</span></button>
+                <button class="filter-pill" onclick="setCampaignStatusFilter('paused', this)">⏸ Pausadas <span class="pill-count" id="count-campaigns-paused">0</span></button>
+                <button class="filter-pill" onclick="setCampaignStatusFilter('finished', this)">🔴 Finalizadas <span class="pill-count" id="count-campaigns-finished">0</span></button>
+                <button class="filter-pill" onclick="setCampaignStatusFilter('draft', this)">📝 Borradores <span class="pill-count" id="count-campaigns-draft">0</span></button>
               </div>
             </div>
 
@@ -1882,6 +1911,36 @@
 
     // Renderizado de Campañas
     function renderCampaigns() {
+      // 1. Contadores en tiempo real por estado en catálogo
+      const counts = {
+        all: campaigns.length,
+        active: 0,
+        scheduled: 0,
+        paused: 0,
+        finished: 0,
+        draft: 0
+      };
+
+      campaigns.forEach(c => {
+        const st = computeCampaignStatus(c);
+        if (counts[st] !== undefined) {
+          counts[st]++;
+        }
+      });
+
+      const elAll = document.getElementById('count-campaigns-all');
+      if (elAll) elAll.innerText = counts.all;
+      const elAct = document.getElementById('count-campaigns-active');
+      if (elAct) elAct.innerText = counts.active;
+      const elSch = document.getElementById('count-campaigns-scheduled');
+      if (elSch) elSch.innerText = counts.scheduled;
+      const elPau = document.getElementById('count-campaigns-paused');
+      if (elPau) elPau.innerText = counts.paused;
+      const elFin = document.getElementById('count-campaigns-finished');
+      if (elFin) elFin.innerText = counts.finished;
+      const elDra = document.getElementById('count-campaigns-draft');
+      if (elDra) elDra.innerText = counts.draft;
+
       const tbody = document.getElementById('campaigns-table-body');
       tbody.innerHTML = '';
 
@@ -1909,6 +1968,15 @@
         }
         return true;
       });
+
+      const headerCounter = document.getElementById('campaigns-header-counter');
+      if (headerCounter) {
+        if (filtered.length !== campaigns.length) {
+          headerCounter.innerText = `${filtered.length} de ${campaigns.length} campañas`;
+        } else {
+          headerCounter.innerText = `${campaigns.length} ${campaigns.length === 1 ? 'campaña' : 'campañas'} en catálogo`;
+        }
+      }
 
       if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:30px;">No se encontraron campañas con los filtros aplicados.</td></tr>`;
