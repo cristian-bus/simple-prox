@@ -1029,11 +1029,32 @@
       <!-- VISTA TAB 3: COMERCIOS -->
       <div id="view-merchants" class="tab-view hidden">
         <div class="card">
-          <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <h2 class="card-title">Comercios Registrados (Kioscos y Negocios)</h2>
-            <div style="position: relative; width: 220px; flex-shrink: 0;">
-              <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
-              <input type="text" id="merchant-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar comercio..." oninput="filterMerchants()">
+          <div class="card-header">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <h2 class="card-title" style="margin: 0;">Comercios Registrados (Kioscos y Negocios)</h2>
+              <span id="merchants-total-badge" style="font-size: 12px; font-weight: 700; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="store" style="width: 14px; height: 14px; color: #10b981;"></i>
+                <span id="merchants-header-counter">0 comercios</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros y Búsqueda -->
+          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
+              <div style="position: relative; width: 220px; flex-shrink: 0;">
+                <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
+                <input type="text" id="merchant-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar comercio..." oninput="filterMerchants()">
+              </div>
+
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                <button class="filter-pill active" onclick="setMerchantFilter('all', this)">Todos <span class="pill-count" id="count-merchants-all">0</span></button>
+                <button class="filter-pill" onclick="setMerchantFilter('active', this)">🟢 Activos <span class="pill-count" id="count-merchants-active">0</span></button>
+                <button class="filter-pill" onclick="setMerchantFilter('pro', this)">⭐ Plan PRO <span class="pill-count" id="count-merchants-pro">0</span></button>
+                <button class="filter-pill" onclick="setMerchantFilter('basic', this)">📦 Básico <span class="pill-count" id="count-merchants-basic">0</span></button>
+                <button class="filter-pill" onclick="setMerchantFilter('updated', this)">🚀 v1.3.5 <span class="pill-count" id="count-merchants-updated">0</span></button>
+                <button class="filter-pill" onclick="setMerchantFilter('outdated', this)">⚠️ Versión Previa <span class="pill-count" id="count-merchants-outdated">0</span></button>
+              </div>
             </div>
           </div>
 
@@ -1065,7 +1086,13 @@
       <div id="view-distributors" class="tab-view hidden">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Directorio de Distribuidores</h2>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <h2 class="card-title" style="margin: 0;">Directorio de Distribuidores</h2>
+              <span id="distributors-total-badge" style="font-size: 12px; font-weight: 700; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="truck" style="width: 14px; height: 14px; color: #a855f7;"></i>
+                <span id="distributors-header-counter">0 distribuidores</span>
+              </span>
+            </div>
             <div style="display: flex; gap: 10px;">
               <button class="btn btn-primary" onclick="openCreateDistributorModal()">
                 <i data-lucide="plus"></i> Nuevo Distribuidor
@@ -1077,13 +1104,24 @@
           </div>
 
           <!-- Barra de Filtros y Búsqueda -->
-          <div class="filters-bar" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
-            <div style="position: relative; width: 210px; flex-shrink: 0;">
-              <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
-              <input type="text" id="distributor-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar distribuidor..." oninput="renderDistributors()">
+          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
+              <div style="position: relative; width: 220px; flex-shrink: 0;">
+                <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
+                <input type="text" id="distributor-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar distribuidor..." oninput="renderDistributors()">
+              </div>
+
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                <button class="filter-pill active" onclick="setDistributorStatusFilter('all', this)">Todos <span class="pill-count" id="count-distributors-all">0</span></button>
+                <button class="filter-pill" onclick="setDistributorStatusFilter('national', this)">🌐 Nacionales <span class="pill-count" id="count-distributors-national">0</span></button>
+                <button class="filter-pill" onclick="setDistributorStatusFilter('regional', this)">📍 Provinciales <span class="pill-count" id="count-distributors-regional">0</span></button>
+                <button class="filter-pill" onclick="setDistributorStatusFilter('with-min', this)">💰 Con Mínimo <span class="pill-count" id="count-distributors-with-min">0</span></button>
+                <button class="filter-pill" onclick="setDistributorStatusFilter('no-min', this)">✨ Sin Mínimo <span class="pill-count" id="count-distributors-no-min">0</span></button>
+              </div>
             </div>
 
-            <select id="filter-distributor-province" class="form-control" style="width: 175px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="handleDistributorProvinceFilterChange()">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <select id="filter-distributor-province" class="form-control" style="width: 175px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="handleDistributorProvinceFilterChange()">
               <option value="all">Todas las provincias</option>
               <option value="ALL">🌐 Cobertura Nacional</option>
               <option value="AR-X">📍 Córdoba</option>
@@ -2883,23 +2921,87 @@
       }
     }
 
+    let currentMerchantFilter = 'all';
+
+    function setMerchantFilter(filterType, btn) {
+      currentMerchantFilter = filterType;
+      document.querySelectorAll('#view-merchants .filter-pill').forEach(p => p.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      filterMerchants();
+    }
+
     function filterMerchants() {
-      const query = (document.getElementById('merchant-search-input')?.value || '').toLowerCase().trim();
-      if (!query) {
-        renderMerchants(merchantsList);
-        return;
-      }
-      const filtered = merchantsList.filter(m => {
-        const idMatch = (m.id || '').toLowerCase().includes(query);
-        const nameMatch = (m.name || '').toLowerCase().includes(query);
-        const phoneMatch = (m.phone || '').toLowerCase().includes(query);
-        const provMatch = (m.province_name || m.province_code || '').toLowerCase().includes(query);
-        const cityMatch = (m.city_name || m.city || '').toLowerCase().includes(query);
-        const addressMatch = (m.address || '').toLowerCase().includes(query);
-        const installerMatch = (m.installer || '').toLowerCase().includes(query);
-        const versionMatch = (m.app_version || '').toLowerCase().includes(query);
-        return idMatch || nameMatch || phoneMatch || provMatch || cityMatch || addressMatch || installerMatch || versionMatch;
+      const LATEST_APP_VERSION = '1.3.5';
+      const mCounts = {
+        all: merchantsList.length,
+        active: 0,
+        pro: 0,
+        basic: 0,
+        updated: 0,
+        outdated: 0
+      };
+
+      merchantsList.forEach(m => {
+        const isAct = (m.status || 'active') === 'active';
+        const isPro = (m.plan || '').toLowerCase() === 'pro';
+        const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
+        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+
+        if (isAct) mCounts.active++;
+        if (isPro) mCounts.pro++; else mCounts.basic++;
+        if (isUp) mCounts.updated++; else mCounts.outdated++;
       });
+
+      const elMAll = document.getElementById('count-merchants-all');
+      if (elMAll) elMAll.innerText = mCounts.all;
+      const elMAct = document.getElementById('count-merchants-active');
+      if (elMAct) elMAct.innerText = mCounts.active;
+      const elMPro = document.getElementById('count-merchants-pro');
+      if (elMPro) elMPro.innerText = mCounts.pro;
+      const elMBas = document.getElementById('count-merchants-basic');
+      if (elMBas) elMBas.innerText = mCounts.basic;
+      const elMUp = document.getElementById('count-merchants-updated');
+      if (elMUp) elMUp.innerText = mCounts.updated;
+      const elMOut = document.getElementById('count-merchants-outdated');
+      if (elMOut) elMOut.innerText = mCounts.outdated;
+
+      const query = (document.getElementById('merchant-search-input')?.value || '').toLowerCase().trim();
+
+      const filtered = merchantsList.filter(m => {
+        const isAct = (m.status || 'active') === 'active';
+        const isPro = (m.plan || '').toLowerCase() === 'pro';
+        const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
+        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+
+        if (currentMerchantFilter === 'active' && !isAct) return false;
+        if (currentMerchantFilter === 'pro' && !isPro) return false;
+        if (currentMerchantFilter === 'basic' && isPro) return false;
+        if (currentMerchantFilter === 'updated' && !isUp) return false;
+        if (currentMerchantFilter === 'outdated' && isUp) return false;
+
+        if (query) {
+          const idMatch = (m.id || '').toLowerCase().includes(query);
+          const nameMatch = (m.name || '').toLowerCase().includes(query);
+          const phoneMatch = (m.phone || '').toLowerCase().includes(query);
+          const provMatch = (m.province_name || m.province_code || '').toLowerCase().includes(query);
+          const cityMatch = (m.city_name || m.city || '').toLowerCase().includes(query);
+          const addressMatch = (m.address || '').toLowerCase().includes(query);
+          const installerMatch = (m.installer || '').toLowerCase().includes(query);
+          const versionMatch = (m.app_version || '').toLowerCase().includes(query);
+          if (!idMatch && !nameMatch && !phoneMatch && !provMatch && !cityMatch && !addressMatch && !installerMatch && !versionMatch) return false;
+        }
+        return true;
+      });
+
+      const headerCounter = document.getElementById('merchants-header-counter');
+      if (headerCounter) {
+        if (filtered.length !== merchantsList.length) {
+          headerCounter.innerText = `${filtered.length} de ${merchantsList.length} comercios`;
+        } else {
+          headerCounter.innerText = `${merchantsList.length} ${merchantsList.length === 1 ? 'comercio' : 'comercios'} registrados`;
+        }
+      }
+
       renderMerchants(filtered);
     }
 
@@ -3262,8 +3364,52 @@
       renderDistributors();
     }
 
+    let currentDistributorStatusFilter = 'all';
+
+    function setDistributorStatusFilter(status, btn) {
+      currentDistributorStatusFilter = status;
+      document.querySelectorAll('#view-distributors .filter-pill').forEach(p => p.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderDistributors();
+    }
+
     // Funciones CRUD para Distribuidores
     function renderDistributors() {
+      const activeDistributors = distributorsList.filter(d => !d.deleted);
+      const dCounts = {
+        all: activeDistributors.length,
+        national: 0,
+        regional: 0,
+        withMin: 0,
+        noMin: 0
+      };
+
+      activeDistributors.forEach(d => {
+        const prov = d.provinceCode || d.province || 'ALL';
+        if (prov === 'ALL') {
+          dCounts.national++;
+        } else {
+          dCounts.regional++;
+        }
+        const hasMin = d.minPurchase && Number(d.minPurchase) > 0;
+        if (hasMin) {
+          dCounts.withMin++;
+        } else {
+          dCounts.noMin++;
+        }
+      });
+
+      const elDAll = document.getElementById('count-distributors-all');
+      if (elDAll) elDAll.innerText = dCounts.all;
+      const elDNat = document.getElementById('count-distributors-national');
+      if (elDNat) elDNat.innerText = dCounts.national;
+      const elDReg = document.getElementById('count-distributors-regional');
+      if (elDReg) elDReg.innerText = dCounts.regional;
+      const elDMin = document.getElementById('count-distributors-with-min');
+      if (elDMin) elDMin.innerText = dCounts.withMin;
+      const elDNoMin = document.getElementById('count-distributors-no-min');
+      if (elDNoMin) elDNoMin.innerText = dCounts.noMin;
+
       const tbody = document.getElementById('distributors-table-body');
       if (!tbody) return;
       tbody.innerHTML = '';
@@ -3285,6 +3431,12 @@
           if (dCity !== cityFilter && !dCity.includes(cityFilter)) return false;
         }
 
+        const hasMin = d.minPurchase && Number(d.minPurchase) > 0;
+        if (currentDistributorStatusFilter === 'national' && dProv !== 'ALL') return false;
+        if (currentDistributorStatusFilter === 'regional' && dProv === 'ALL') return false;
+        if (currentDistributorStatusFilter === 'with-min' && !hasMin) return false;
+        if (currentDistributorStatusFilter === 'no-min' && hasMin) return false;
+
         if (searchQuery) {
           const matchName = (d.name || '').toLowerCase().includes(searchQuery);
           const matchCat = (d.category || '').toLowerCase().includes(searchQuery);
@@ -3294,6 +3446,15 @@
         }
         return true;
       });
+
+      const dHeaderCounter = document.getElementById('distributors-header-counter');
+      if (dHeaderCounter) {
+        if (filtered.length !== activeDistributors.length) {
+          dHeaderCounter.innerText = `${filtered.length} de ${activeDistributors.length} distribuidores`;
+        } else {
+          dHeaderCounter.innerText = `${activeDistributors.length} ${activeDistributors.length === 1 ? 'distribuidor' : 'distribuidores'} en directorio`;
+        }
+      }
 
       if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:30px;">No se encontraron distribuidores con los filtros aplicados.</td></tr>`;
