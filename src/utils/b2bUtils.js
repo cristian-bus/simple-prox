@@ -207,7 +207,7 @@ export const isCampaignEligibleForCommerce = (campaign, commerceProfile) => {
  */
 export const getCampaignStatus = (campaign) => {
   if (!campaign) return 'draft';
-  if (campaign.deleted || campaign.status === 'deleted' || campaign.status === 'finished') return 'finished';
+  if (campaign.deleted || campaign.status === 'deleted') return 'finished';
   if (campaign.status === 'draft') return 'draft';
   if (campaign.status === 'paused') return 'paused';
 
@@ -242,6 +242,16 @@ export const getCampaignStatus = (campaign) => {
     if (!isNaN(endTime) && endTime < nowTime) {
       return 'finished';
     }
+  }
+
+  if (campaign.status === 'finished') {
+    if (end) {
+      const endTime = new Date(end).getTime();
+      if (!isNaN(endTime) && endTime > nowTime) {
+        return 'active';
+      }
+    }
+    return 'finished';
   }
 
   return 'active';

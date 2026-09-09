@@ -1889,7 +1889,7 @@
 
     // Cálculo robusto del estado usando timestamps reales
     function computeCampaignStatus(c) {
-      if (c.deleted === true || c.status === 'deleted' || c.status === 'finished') return 'finished';
+      if (c.deleted === true || c.status === 'deleted') return 'finished';
       if (c.status === 'draft') return 'draft';
       if (c.status === 'paused') return 'paused';
 
@@ -1923,6 +1923,18 @@
         if (!isNaN(endTime) && endTime < nowTime) {
           return 'finished';
         }
+      }
+
+      // Si tiene status 'finished' pero su fecha de vigencia aún NO ha terminado y no está borrada,
+      // la respetamos como activa para no cortar campañas vigentes
+      if (c.status === 'finished') {
+        if (end) {
+          const endTime = new Date(end).getTime();
+          if (!isNaN(endTime) && endTime > nowTime) {
+            return 'active';
+          }
+        }
+        return 'finished';
       }
 
       return 'active';
@@ -2884,7 +2896,7 @@
               });
               if (mRes.ok) {
                 merchantsList = await mRes.json();
-                renderMerchants(merchantsList);
+                filterMerchants();
               }
             } catch(e) {}
           }
@@ -2914,7 +2926,7 @@
         });
         if (res.ok) {
           merchantsList = await res.json();
-          renderMerchants(merchantsList);
+          filterMerchants();
         }
       } catch (err) {
         console.warn('Error al cargar comercios de Supabase:', err);
@@ -3006,6 +3018,51 @@
     }
 
     function renderMerchants(merchants) {
+        // Asegurar que los contadores se sincronicen siempre
+        const sourceList = (merchantsList && merchantsList.length > 0) ? merchantsList : (merchants || []);
+        const LATEST_APP_VERSION = '1.3.5';
+        const mCounts = {
+          all: sourceList.length,
+          active: 0,
+          pro: 0,
+          basic: 0,
+          updated: 0,
+          outdated: 0
+        };
+
+        sourceList.forEach(m => {
+          const isAct = (m.status || 'active') === 'active';
+          const isPro = (m.plan || '').toLowerCase() === 'pro';
+          const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
+          const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+
+          if (isAct) mCounts.active++;
+          if (isPro) mCounts.pro++; else mCounts.basic++;
+          if (isUp) mCounts.updated++; else mCounts.outdated++;
+        });
+
+        const elMAll = document.getElementById('count-merchants-all');
+        if (elMAll) elMAll.innerText = mCounts.all;
+        const elMAct = document.getElementById('count-merchants-active');
+        if (elMAct) elMAct.innerText = mCounts.active;
+        const elMPro = document.getElementById('count-merchants-pro');
+        if (elMPro) elMPro.innerText = mCounts.pro;
+        const elMBas = document.getElementById('count-merchants-basic');
+        if (elMBas) elMBas.innerText = mCounts.basic;
+        const elMUp = document.getElementById('count-merchants-updated');
+        if (elMUp) elMUp.innerText = mCounts.updated;
+        const elMOut = document.getElementById('count-merchants-outdated');
+        if (elMOut) elMOut.innerText = mCounts.outdated;
+
+        const headerCounter = document.getElementById('merchants-header-counter');
+        if (headerCounter) {
+          if (merchants && merchants.length !== sourceList.length) {
+            headerCounter.innerText = `${merchants.length} de ${sourceList.length} comercios`;
+          } else {
+            headerCounter.innerText = `${sourceList.length} ${sourceList.length === 1 ? 'comercio' : 'comercios'} registrados`;
+          }
+        }
+
         const tbody = document.getElementById('merchants-table-body');
         if (!tbody) return;
         tbody.innerHTML = '';
