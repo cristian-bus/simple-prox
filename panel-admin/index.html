@@ -1177,7 +1177,7 @@
                 <button class="filter-pill" onclick="setMerchantFilter('active', this)">🟢 Activos <span class="pill-count" id="count-merchants-active">0</span></button>
                 <button class="filter-pill" onclick="setMerchantFilter('pro', this)">⭐ Plan PRO <span class="pill-count" id="count-merchants-pro">0</span></button>
                 <button class="filter-pill" onclick="setMerchantFilter('basic', this)">📦 Básico <span class="pill-count" id="count-merchants-basic">0</span></button>
-                <button class="filter-pill" onclick="setMerchantFilter('updated', this)">🚀 v1.3.5 <span class="pill-count" id="count-merchants-updated">0</span></button>
+                <button class="filter-pill" onclick="setMerchantFilter('updated', this)">🚀 v1.3.6 <span class="pill-count" id="count-merchants-updated">0</span></button>
                 <button class="filter-pill" onclick="setMerchantFilter('outdated', this)">⚠️ Versión Previa <span class="pill-count" id="count-merchants-outdated">0</span></button>
               </div>
             </div>
@@ -3330,7 +3330,7 @@
     }
 
     function filterMerchants() {
-      const LATEST_APP_VERSION = '1.3.5';
+      const LATEST_APP_VERSION = '1.3.6';
       const mCounts = {
         all: merchantsList.length,
         active: 0,
@@ -3344,7 +3344,7 @@
         const isAct = (m.status || 'active') === 'active';
         const isPro = (m.plan || '').toLowerCase() === 'pro';
         const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.6';
 
         if (isAct) mCounts.active++;
         if (isPro) mCounts.pro++; else mCounts.basic++;
@@ -3372,7 +3372,7 @@
         const isAct = (m.status || 'active') === 'active';
         const isPro = (m.plan || '').toLowerCase() === 'pro';
         const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.6';
 
         if (currentMerchantFilter === 'active' && !isAct) return false;
         if (currentMerchantFilter === 'pro' && !isPro) return false;
@@ -3420,7 +3420,7 @@
     function renderMerchants(merchants) {
         // Asegurar que los contadores se sincronicen siempre
         const sourceList = (merchantsList && merchantsList.length > 0) ? merchantsList : (merchants || []);
-        const LATEST_APP_VERSION = '1.3.5';
+        const LATEST_APP_VERSION = '1.3.6';
         const mCounts = {
           all: sourceList.length,
           active: 0,
@@ -3434,7 +3434,7 @@
           const isAct = (m.status || 'active') === 'active';
           const isPro = (m.plan || '').toLowerCase() === 'pro';
           const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-          const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+          const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.6';
 
           if (isAct) mCounts.active++;
           if (isPro) mCounts.pro++; else mCounts.basic++;
@@ -3503,9 +3503,9 @@
             ? '<a href="https://api.whatsapp.com/send?phone=' + cleanPhone + '" target="_blank" style="color: #10b981; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">📱 ' + m.phone + '</a>' 
             : '<span style="color: var(--text-muted);">-</span>';
 
-          const LATEST_APP_VERSION = '1.3.5';
+          const LATEST_APP_VERSION = '1.3.6';
           const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-          const isUpToDate = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.5';
+          const isUpToDate = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.6';
           const versionBadge = isUpToDate
             ? `<span style="background: rgba(16, 185, 129, 0.12); color: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">${verStr}</span>`
             : `<span style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;" title="Instalación con versión previa (${verStr}) - Requiere v${LATEST_APP_VERSION}">${verStr} ⚠️</span>`;
