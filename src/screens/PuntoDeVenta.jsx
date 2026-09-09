@@ -4,6 +4,7 @@ import { useWindowSize } from '../hooks/useWindowSize';
 import OfertasBannerWidget from '../components/OfertasBannerWidget';
 import OfertaDetailModal from '../components/OfertaDetailModal';
 import { getLowStockReplenishmentOpportunities } from '../utils/stockOfferMatcher';
+import UpdateNotificationPill from '../components/UpdateNotificationPill';
 
 const MOCK_PRODUCTS = [
   { id: 1, name: "Coca Cola 1.5L", price: 3500, category: "Bebidas", stock: 24, img: "CC", code: "1001" },
@@ -952,6 +953,7 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
             }}>
               {kiosco.businessConfig?.storeName || 'Mi Negocio'}
             </h1>
+            <UpdateNotificationPill kiosco={kiosco} />
           </div>
         </div>
 

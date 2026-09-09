@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShoppingCart, 
   Package, 
@@ -14,8 +14,17 @@ import {
   Calendar,
   Tag
 } from 'lucide-react';
+import { subscribeUpdate, UPDATE_STATUS } from '../services/updateService';
 
 const BottomNav = ({ currentScreen, setCurrentScreen, activeUser, navCollapsed, setNavCollapsed, kiosco }) => {
+  const [updateReady, setUpdateReady] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeUpdate((state) => {
+      setUpdateReady(state.status === UPDATE_STATUS.READY_TO_INSTALL);
+    });
+    return () => unsub();
+  }, []);
   const allNavItems = [
     { id: 'punto-venta', label: 'Venta', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
     { id: 'turnos', label: 'Turnos', icon: Calendar, roles: ['Admin', 'Vendedor'] },
@@ -50,8 +59,24 @@ const BottomNav = ({ currentScreen, setCurrentScreen, activeUser, navCollapsed, 
               onClick={() => setCurrentScreen(item.id)}
               className={`nav-item ${isActive ? 'active' : ''}`}
             >
-              <div className="icon-wrapper">
+              <div className="icon-wrapper" style={{ position: 'relative' }}>
                 <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                {item.id === 'configuracion' && updateReady && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-2px',
+                      right: '-2px',
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: '#10b981',
+                      borderRadius: '50%',
+                      boxShadow: '0 0 6px #10b981',
+                      border: '1.5px solid var(--color-surface, #ffffff)'
+                    }}
+                    title="Actualización del sistema lista"
+                  />
+                )}
               </div>
               <span className="nav-label">{item.label}</span>
               {isActive && <div className="active-indicator" />}

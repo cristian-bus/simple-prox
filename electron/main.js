@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 
 // Configuración defensiva de auto-update
 autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = false; // Regla crítica: nunca forzar reinicio no deseado
+autoUpdater.autoInstallOnAppQuit = true; // Se aplica automáticamente al cerrar la app si ya se descargó
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -94,8 +94,13 @@ function createWindow() {
     // Comprobar actualizaciones en background 4 segundos tras el inicio (en producción)
     if (process.env.NODE_ENV !== 'development') {
       setTimeout(() => {
-        autoUpdater.checkForUpdates().catch(e => console.warn('[Main] Error chequeando updates:', e));
+        autoUpdater.checkForUpdates().catch(e => console.warn('[Main] Error chequeando updates iniciales:', e));
       }, 4000);
+
+      // Comprobar actualizaciones periódicamente cada 4 horas
+      setInterval(() => {
+        autoUpdater.checkForUpdates().catch(e => console.warn('[Main] Error chequeando updates periódicos:', e));
+      }, 4 * 60 * 60 * 1000);
     }
   });
 
