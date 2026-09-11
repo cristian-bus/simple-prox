@@ -1,5 +1,87 @@
 # Registro de Decisiones y Cambios
 
+## 2026-09-11 (Filtro por Ciudad en Campañas B2B y Menú de Acciones Fijo con Dropup Inteligente)
+- **Fase**: FASE 4 / FASE 2 — Panel Administrador (UI/UX de Campañas B2B)
+- **Problema**: 
+  - En la pestaña "Campañas B2B" no era posible filtrar por ciudad/localidad específica para aislar promociones locales (ej. Río Cuarto vs Córdoba Capital).
+  - Al colocar el puntero sobre los tres puntos de una campaña, el menú desplegable (`.dropdown-content`) dependía exclusivamente de `:hover` y quedaba cortado por el borde inferior del contenedor de la tabla con scroll vertical, cerrándose abruptamente ("el cuadro gris se reduce") en cuanto el cursor se desplazaba para hacer clic en Duplicar o Pausar.
+- **Solución**:
+  1. `panel-admin/index.html`:
+     - Se añadió el selector `filter-campaign-city` en la barra de filtros de Campañas B2B, sincronizado reactivamente mediante `handleCampaignProvinceFilterChange()`. Si se selecciona una provincia (ej. Córdoba), se pueblan sus localidades; si se elige una ciudad (ej. Río Cuarto), se filtran las campañas pertinentes.
+     - Se transformó el menú de acciones de los 3 puntos en un menú de activación por clic mediante `toggleDropdownMenu(event, this)`, con detección automática de espacio inferior para alternar a `.dropup` (apertura hacia arriba) si está cerca del fondo, asegurando que nunca se corte ni se cierre al mover el ratón.
+     - Se configuró el cierre automático al hacer clic en cualquier opción o fuera del menú.
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Verificación de la apertura por clic y dropup automático en tablas cortas o filas inferiores.
+  - Verificación del filtrado reactivo de campañas por provincia y ciudad.
+  - Compilación de producción con Vite (`npm run build`, 0 errores).
+- **Resultado**: Filtrado preciso por provincia y ciudad en Campañas B2B y menú de tres puntos estable, accesible y sin recortes.
+
+## 2026-09-11 (Corrección de Filtrado Geográfico en Directorio de Distribuidores y Campañas B2B)
+- **Fase**: FASE 4 / FASE 2 — Panel Administrador y Segmentación Geográfica de Campañas B2B
+- **Problema**: 
+  - Al cambiar campañas a San Luis (`AR-D`), en el Directorio de Distribuidores del panel de administración los distribuidores de San Luis (como Distribuidora Central San Luis, Mayorista El Triunfo, Distribuidora Arcor Oficial, Mayorista MIC) continuaban figurando con ubicación `🌐 Nacional`.
+  - Al aplicar el filtro desplegable "🌐 Cobertura Nacional", dichos mayoristas continuaban mostrándose en vez de aislarse a su provincia correspondiente.
+  - Además, en la pestaña "Campañas B2B" no existía selector de filtro por provincia/cobertura para visualizar rápidamente ofertas nacionales vs provinciales.
+  - Causa raíz:
+    - `loadDistributors()` leía directamente de `localStorage` (`kioscoprox_distributors_cache`) sin contrastar con el catálogo canónico `b2b_distributors.json`, persistiendo valores obsoletos `provinceCode: 'ALL'`.
+- **Solución**:
+  1. `panel-admin/index.html`:
+     - Se implementó un merge canónico en `loadDistributors()` que corrige distribuidores oficiales y resuelve provincias por nombre o prefijo telefónico (ej. San Luis con `AR-D`, Córdoba con `AR-X`).
+     - Se añadió el selector de filtro por provincia/cobertura (`filter-campaign-province`) en la pestaña "Campañas B2B" conectado a `renderCampaigns()`.
+     - Se sincronizó el conteo de pastillas (Nacionales vs Provinciales) y la tabla del Directorio de Distribuidores.
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Verificación del filtrado en cascada y conteos de distribuidores por cobertura.
+  - Verificación del filtrado por provincia en la lista de campañas.
+  - Compilación de producción con Vite (`npm run build`, 0 errores).
+- **Resultado**: Los distribuidores y campañas se filtran y clasifican con su provincia real (San Luis, Córdoba, Nacional), respondiendo fielmente a cada selección de cobertura.
+
+## 2026-09-11 (Corrección de Selector de Ciudad Bloqueado al Crear Campañas en Panel Admin)
+- **Fase**: FASE 4 / FASE 2 — Panel Administrador y Segmentación Geográfica de Campañas B2B
+- **Problema**: 
+  - Al crear una nueva campaña en `panel-admin/index.html`, tras seleccionar un distribuidor que tenía configurada una provincia (ej. Córdoba), el campo "Provincia / Cobertura" se actualizaba automáticamente a `📍 Córdoba`, pero el campo "Ciudad / Localidad Específica" permanecía bloqueado (`disabled`) con el texto `🌐 Todo el país (Nacional)`, impidiendo elegir la ciudad de segmentación.
+  - Causa raíz:
+    - La función `handleSupplierChange(e)` modificaba el valor del select `form-target-province` de forma programática pero no invocaba a `handleTargetProvinceChange()`. En consecuencia, el select de ciudades nunca poblaba sus opciones ni removía el atributo `disabled`.
+- **Solución**:
+  1. `panel-admin/index.html`:
+     - Se actualizó `handleSupplierChange` para invocar inmediatamente `handleTargetProvinceChange(targetCity)` e intentar deducir o preseleccionar la localidad del distribuidor si existía.
+     - Se agregaron eventos `onchange` y `oninput` tanto al select de provincia como al de ciudad para garantizar reactividad instantánea al interactuar con mouse o teclado.
+     - Se expandió el catálogo `ARGENTINA_GEO_CITIES` con las 24 jurisdicciones de Argentina y sus principales ciudades, dotando de cursor e indicador visual interactivo a la lista desplegable cuando está habilitada.
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Verificación del flujo de cambio de distribuidor y actualización en cascada del selector de ciudades.
+  - Compilación de producción con Vite (`npm run build`, exitoso).
+- **Resultado**: Al elegir o cambiar de proveedor o provincia, el selector de ciudades se desbloquea al instante permitiendo elegir "Toda la provincia" o cualquiera de sus localidades específicas (ej. Río Cuarto, Córdoba Capital, Villa María, etc.).
+
+## 2026-09-11 (Corrección de Pestaña "Configuración API" Vacía en Panel Admin)
+- **Fase**: FASE 4 / FASE 3 — Panel Administrador y Configuración API Nube
+- **Problema**: 
+  - Al hacer clic en la pestaña "Configuración API" en `panel-admin/index.html`, la vista debajo de las tarjetas KPI quedaba completamente vacía en azul oscuro, sin mostrar el formulario de Supabase URL/Key ni el botón de diagnóstico.
+  - Causa raíz:
+    - En la vista anterior (`view-distributors`), el contenedor `.filters-bar` (línea 1246) tenía dos bloques flex anidados pero carecía de su etiqueta de cierre `</div>` antes de `.table-container`.
+    - Como consecuencia, los cierres `</div>` posteriores cerraron `.table-container`, `.filters-bar` y `.card`, dejando el elemento `<div id="view-distributors">` abierto.
+    - Esto provocó que `<div id="view-settings">` se renderizara dentro de `view-distributors`. Al cambiar de pestaña, `view-distributors` tenía la clase `.hidden` (`display: none !important`), impidiendo la visibilidad de su hijo `view-settings`.
+- **Solución**:
+  1. `panel-admin/index.html`:
+     - Se añadió el cierre `</div>` correspondiente a `.filters-bar`, restaurando el balance exacto de divs (stack final = 0).
+     - Se ubicó `view-settings` como pestaña hermana en el nivel raíz de `.content-area`.
+     - Se mejoró `switchTab(tabName)` para asignar la clase `active` al botón del sidebar de forma robusta e invocar automáticamente `loadSettings()` al abrir la pestaña de configuración para precargar las credenciales guardadas en los inputs.
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Script de validación DOM de apertura/cierre de etiquetas `div` (stack resultante: 0).
+  - Verificación de la jerarquía directa de `view-settings` en `.content-area`.
+  - Compilación de producción con Vite (`npm run build`).
+- **Resultado**: La pestaña "Configuración API" se despliega con su tarjeta de credenciales de Supabase, campos de URL/Key y botón de diagnóstico.
+
 ## 2026-09-07 (FASE 11 - Evolución B2B: Carrito Multiproducto para Pedido Mayorista)
 - **Fase**: FASE 11 — Evolución B2B (Paso C: Pedido Multiproducto Consolidado)
 - **Problema**: 
@@ -396,3 +478,32 @@
   - `electron/main.js`
   - `docs/DECISIONS.md`
 - **Resultado**: Experiencia de actualización fluida y 100% no invasiva que garantiza que las terminales se mantengan al día sin interrumpir las ventas.
+
+## 2026-09-11 (Segmentación Geográfica Granular por Ciudad y Cobertura Nacional de Ofertas B2B)
+- **Fase**: FASE 6 / FASE 8 - Ofertas B2B y Matching Geográfico
+- **Problema**: 
+  1. Al configurar un comercio en Córdoba - Río Cuarto, aparecía una oferta destinada a Córdoba Capital y no se mostraban las ofertas nacionales.
+  2. En `panel-admin/index.html` solo existía selección de Provincia (`form-target-province`) y no de Ciudad/Localidad (`targetCities`), por lo que cualquier campaña configurada para Córdoba cubría a toda la provincia indistintamente (incluyendo Río Cuarto).
+  3. En Supabase, las ofertas de Distribuidora MAC (mayorista nacional de Cervezas, Fernet, Sidras, Vinos) tenían asignada la provincia de San Luis (`AR-D`) o Bs. As. (`AR-B`), impidiendo que comercios de Córdoba u otras provincias las visualizaran como ofertas nacionales.
+- **Solución**:
+  1. En `panel-admin/index.html`:
+     - Se incorporó el catálogo offline de localidades por provincia (`ARGENTINA_GEO_CITIES`).
+     - Se agregó el selector dinámico `form-target-city` en el modal de Campañas para permitir segmentar por provincia completa o por ciudad específica (ej. Córdoba Capital vs Río Cuarto).
+     - Se actualizaron `embedB2BMetadata`, `handleSaveCampaign`, `openCreateModal`, `openEditModal` y `syncCampaignToSupabase` para persistir y cargar `targetCities`.
+     - Se enriqueció la tabla de campañas y la previsualización para mostrar el alcance geográfico exacto con ciudad.
+  2. En `src/utils/b2bUtils.js`:
+     - Se normalizaron las comparaciones geográficas con `normalizeGeoStr` (sin tildes, minúsculas, sin espacios) para evitar falsos positivos/negativos.
+     - Se garantizó que si `targetCities` está configurado y no es `ALL`, comercios de otras localidades (ej. Río Cuarto frente a Córdoba Capital) sean estrictamente excluidos.
+  3. En `src/hooks/useOfertas.js`:
+     - Se implementó `effectiveCommerceProfile` reactivo para responder instantáneamente ante cambios de localidad en Configuración sin requerir reinicio.
+  4. En Supabase:
+     - Se actualizó la campaña de Córdoba Capital a `targetProvinces: ["AR-X"]`, `targetCities: ["CBA-CAPITAL"]`.
+     - Se actualizaron las ofertas de Distribuidora MAC a `targetProvinces: ["ALL"]` (Nacional).
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `src/utils/b2bUtils.js`
+  - `src/hooks/useOfertas.js`
+  - Base de datos Supabase (tabla `campaigns`)
+  - `docs/DECISIONS.md`
+- **Resultado**: Un kiosco configurado en Río Cuarto ya no recibe ofertas dirigidas a Córdoba Capital y recibe todas las ofertas nacionales de forma inmediata y verificada.
+

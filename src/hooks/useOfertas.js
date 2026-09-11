@@ -35,28 +35,39 @@ export function useOfertas(kiosco) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const merchantId = commerceProfile.installationId || businessConfig.installationId || 'PC-DESK-001';
-  const city = commerceProfile.cityName || businessConfig.city || '';
-  const effectiveStoreName = commerceProfile.storeName || businessConfig.storeName || businessConfig.name || '';
+  const effectiveCommerceProfile = useMemo(() => {
+    return {
+      ...commerceProfile,
+      provinceCode: businessConfig.provinceCode || commerceProfile.provinceCode,
+      provinceName: businessConfig.provinceName || commerceProfile.provinceName,
+      cityCode: businessConfig.cityCode || commerceProfile.cityCode,
+      cityName: businessConfig.cityName || commerceProfile.cityName,
+      storeName: businessConfig.storeName || commerceProfile.storeName
+    };
+  }, [commerceProfile, businessConfig.provinceCode, businessConfig.provinceName, businessConfig.cityCode, businessConfig.cityName, businessConfig.storeName]);
+
+  const merchantId = effectiveCommerceProfile.installationId || businessConfig.installationId || 'PC-DESK-001';
+  const city = effectiveCommerceProfile.cityName || businessConfig.city || '';
+  const effectiveStoreName = effectiveCommerceProfile.storeName || businessConfig.storeName || businessConfig.name || '';
 
   // Sincronizar siempre datos del comercio con perfil completo
   useEffect(() => {
     registerMerchantRemotely({
       installationId: merchantId,
-      commerceId: commerceProfile.commerceId,
+      commerceId: effectiveCommerceProfile.commerceId,
       storeName: effectiveStoreName,
       plan: businessConfig.plan || 'Básico',
-      provinceCode: commerceProfile.provinceCode,
-      provinceName: commerceProfile.provinceName,
-      cityCode: commerceProfile.cityCode,
-      cityName: commerceProfile.cityName,
-      address: commerceProfile.address || businessConfig.address || '',
-      phone: commerceProfile.phone || businessConfig.phone || '',
-      installer: commerceProfile.installer || '',
+      provinceCode: effectiveCommerceProfile.provinceCode,
+      provinceName: effectiveCommerceProfile.provinceName,
+      cityCode: effectiveCommerceProfile.cityCode,
+      cityName: effectiveCommerceProfile.cityName,
+      address: effectiveCommerceProfile.address || businessConfig.address || '',
+      phone: effectiveCommerceProfile.phone || businessConfig.phone || '',
+      installer: effectiveCommerceProfile.installer || '',
       appVersion: APP_VERSION,
       city
     }).catch(() => {});
-  }, [merchantId, effectiveStoreName, businessConfig.plan]);
+  }, [merchantId, effectiveStoreName, businessConfig.plan, effectiveCommerceProfile.provinceCode, effectiveCommerceProfile.cityCode]);
 
   // Filtrar estrictamente sólo las campañas con estado "active" y que sean elegibles geográficamente
   const campaigns = useMemo(() => {
@@ -67,9 +78,9 @@ export function useOfertas(kiosco) {
       if (!isActive) return false;
 
       // Matching geográfico automático
-      return isCampaignEligibleForCommerce(c, commerceProfile);
+      return isCampaignEligibleForCommerce(c, effectiveCommerceProfile);
     });
-  }, [rawCampaigns, commerceProfile.provinceCode, commerceProfile.cityCode]);
+  }, [rawCampaigns, effectiveCommerceProfile]);
 
   // Recarga manual
   const refetch = useCallback(async () => {

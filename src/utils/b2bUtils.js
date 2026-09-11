@@ -147,6 +147,18 @@ export const extractB2BMetadata = (rawDescription) => {
 };
 
 /**
+ * Normaliza cadenas geográficas para comparaciones robustas (sin tildes, minúsculas y sin espacios extra)
+ */
+const normalizeGeoStr = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+};
+
+/**
  * Determina si una campaña B2B corresponde a un comercio según su provincia y ciudad
  */
 export const isCampaignEligibleForCommerce = (campaign, commerceProfile) => {
@@ -177,12 +189,15 @@ export const isCampaignEligibleForCommerce = (campaign, commerceProfile) => {
     return true;
   }
 
-  const provCode = commerceProfile.provinceCode || 'AR-D';
+  const provCode = normalizeGeoStr(commerceProfile.provinceCode || 'AR-D');
+  const provName = normalizeGeoStr(commerceProfile.provinceName || '');
+
   // Verificar concordancia de provincia (por código ISO o por nombre)
-  const matchesProvince = targetProvinces.includes(provCode) 
-    || targetProvinces.includes(commerceProfile.provinceName)
-    || (provCode === 'AR-D' && targetProvinces.includes('San Luis'))
-    || (provCode === 'AR-X' && (targetProvinces.includes('Córdoba') || targetProvinces.includes('Cordoba')));
+  const matchesProvince = targetProvinces.some(tp => {
+    const normTp = normalizeGeoStr(tp);
+    if (normTp === 'all') return true;
+    return normTp === provCode || normTp === provName;
+  });
 
   if (!matchesProvince) {
     return false;
@@ -190,9 +205,15 @@ export const isCampaignEligibleForCommerce = (campaign, commerceProfile) => {
 
   // Si la provincia coincide y además hay ciudades específicas configuradas
   if (targetCities && Array.isArray(targetCities) && targetCities.length > 0 && !targetCities.includes('ALL')) {
-    const cityCode = commerceProfile.cityCode || '';
-    const cityName = commerceProfile.cityName || '';
-    const matchesCity = targetCities.includes(cityCode) || targetCities.includes(cityName);
+    const cityCode = normalizeGeoStr(commerceProfile.cityCode || '');
+    const cityName = normalizeGeoStr(commerceProfile.cityName || '');
+
+    const matchesCity = targetCities.some(tc => {
+      const normTc = normalizeGeoStr(tc);
+      if (!normTc || normTc === 'all') return true;
+      return normTc === cityCode || normTc === cityName;
+    });
+
     if (!matchesCity) {
       return false;
     }
