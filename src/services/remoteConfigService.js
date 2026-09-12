@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG = {
   updatedAt: '2026-09-01T00:00:00Z',
   b2bEnabled: true,
   bannerEnabled: true,
-  bannerInterval: 120, // segundos
+  bannerInterval: 7, // segundos (rotación ágil y visible en caja)
   syncIntervalMinutes: 15,
   minimumSupportedVersion: '1.3.0',
   updateChannel: 'stable',
@@ -36,6 +36,10 @@ function loadLocalConfig() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (isValidConfig(parsed)) {
+          // Si tiene el valor antiguo de 120s o excesivo (>30s), corregir a 7s
+          if (parsed.bannerInterval && parsed.bannerInterval >= 30) {
+            parsed.bannerInterval = 7;
+          }
           return { ...DEFAULT_CONFIG, ...parsed };
         }
       }

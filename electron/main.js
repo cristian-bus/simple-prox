@@ -141,8 +141,8 @@ function createWindow() {
   });
 
   ipcMain.on('apply-update', () => {
-    // Aplica la actualización y reinicia de forma segura
-    autoUpdater.quitAndInstall(false, true);
+    // Aplica la actualización en modo silencioso y reinicia automáticamente de forma forzada
+    autoUpdater.quitAndInstall(true, true);
   });
 
   ipcMain.on('confirm-close', () => {

@@ -152,17 +152,43 @@ export function useOfertas(kiosco) {
     };
   }, [showAds, merchantId, city]);
 
-  // Rotación automática del widget de banner según Remote Config (por defecto 120s o configurado)
-  useEffect(() => {
-    if (!showAds || campaigns.length === 0) return;
+  // Control de hover para pausar la rotación cuando el usuario interactúa con el banner
+  const [isHovered, setIsHovered] = useState(false);
 
-    const rotationMs = Math.max(5000, (remoteConfig.bannerInterval || 120) * 1000);
+  // Funciones de navegación manual entre ofertas
+  const nextAd = useCallback(() => {
+    if (campaigns.length > 1) {
+      setCurrentAdIndex((prev) => (prev + 1) % campaigns.length);
+    }
+  }, [campaigns.length]);
+
+  const prevAd = useCallback(() => {
+    if (campaigns.length > 1) {
+      setCurrentAdIndex((prev) => (prev - 1 + campaigns.length) % campaigns.length);
+    }
+  }, [campaigns.length]);
+
+  const goToAd = useCallback((index) => {
+    if (campaigns.length > 0 && index >= 0 && index < campaigns.length) {
+      setCurrentAdIndex(index);
+    }
+  }, [campaigns.length]);
+
+  // Rotación automática del widget de banner (7 segundos por defecto, pausa en hover)
+  useEffect(() => {
+    if (!showAds || campaigns.length <= 1 || isHovered) return;
+
+    // Si bannerInterval viene como 120 (el valor antiguo) o mayor a 30, usar 7s
+    const rawInterval = Number(remoteConfig.bannerInterval);
+    const intervalSec = (rawInterval >= 3 && rawInterval <= 30) ? rawInterval : 7;
+    const rotationMs = intervalSec * 1000;
+
     const timer = setInterval(() => {
       setCurrentAdIndex((prev) => (prev + 1) % campaigns.length);
     }, rotationMs);
 
     return () => clearInterval(timer);
-  }, [showAds, campaigns.length, remoteConfig.bannerInterval]);
+  }, [showAds, campaigns.length, remoteConfig.bannerInterval, isHovered]);
 
   // Registrar impresión al cambiar el anuncio en pantalla
   const activeCampaign = useMemo(() => {
@@ -276,6 +302,11 @@ export function useOfertas(kiosco) {
     activeCampaign,
     currentAdIndex,
     setCurrentAdIndex,
+    nextAd,
+    prevAd,
+    goToAd,
+    isHovered,
+    setIsHovered,
     selectedCampaign,
     isModalOpen,
     loading,

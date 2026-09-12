@@ -507,3 +507,32 @@
   - `docs/DECISIONS.md`
 - **Resultado**: Un kiosco configurado en Río Cuarto ya no recibe ofertas dirigidas a Córdoba Capital y recibe todas las ofertas nacionales de forma inmediata y verificada.
 
+## 2026-09-11 (Versión 1.3.8: Rotación Ágil de Banners en Ventas y Relaunch Silencioso de Actualización)
+- **Fase**: FASE 6 / FASE 8 / FASE 9 - UX de Actualizaciones y Widget de Ofertas
+- **Problema**:
+  1. Al actualizar a la v1.3.7, el sistema se cerraba y no se relanzaba automáticamente porque `quitAndInstall(false, true)` ignoraba el segundo parámetro al no estar en modo silencioso (`isSilent = false`).
+  2. En la pantalla de Ventas, el widget de ofertas tardaba 120 segundos (2 minutos) por banner debido al intervalo heredado en `remoteConfigService.js`, dando la sensación de que las ofertas estaban congeladas o no pasaban.
+  3. No existían controles manuales para que el cajero pudiera adelantar o retroceder de oferta sin esperar el temporizador.
+- **Solución**:
+  1. En `electron/main.js`:
+     - Se configuró `autoUpdater.quitAndInstall(true, true)` para que la instalación sea silenciosa y el relanzamiento de la aplicación tras la actualización sea automático e inmediato.
+  2. En `src/services/remoteConfigService.js` y `src/hooks/useOfertas.js`:
+     - Se redujo el tiempo de rotación por defecto de 120 segundos a 7 segundos.
+     - Se saneó `loadLocalConfig()` para descartar cualquier valor obsoleto residual `>= 30s` del localStorage y aplicar los 7 segundos.
+     - Se agregó soporte para pausar la rotación cuando el puntero del ratón está sobre el banner (`isHovered`), reanudando al salir.
+     - Se expusieron funciones de navegación manual (`nextAd`, `prevAd`, `goToAd`).
+  3. En `src/components/OfertasBannerWidget.jsx`:
+     - Se incorporaron botones interactivos de flecha anterior y siguiente (`<ChevronLeft>` / `<ChevronRight>`).
+     - Se añadieron puntos indicadores interactivos y clicables con contador `(X/N)`.
+     - Se implementó animación de transición suave de opacidad y desplazamiento horizontal entre ofertas.
+- **Archivos modificados**:
+  - `electron/main.js`
+  - `src/services/remoteConfigService.js`
+  - `src/hooks/useOfertas.js`
+  - `src/components/OfertasBannerWidget.jsx`
+  - `package.json`
+  - `src/constants/version.js`
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Resultado**: La aplicación se reinicia automáticamente tras actualizarse, y las ofertas en caja rotan dinámicamente cada 7 segundos con control manual total e interactivo.
+
