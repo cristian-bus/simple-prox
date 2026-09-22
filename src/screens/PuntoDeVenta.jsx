@@ -78,11 +78,11 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
     return products.filter(p => {
       if (!p.isActive || p.isCombo || p.isService) return false;
       
-      const currentStock = p.stock || 0;
-      const alertStock = p.stockAlert || 0;
+      const currentStock = Number(p.stock) || 0;
+      const alertStock = p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5;
       
       return currentStock <= alertStock;
-    }).sort((a, b) => (a.stock || 0) - (b.stock || 0));
+    }).sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
   }, [products, kiosco.businessConfig?.plan]);
 
   // FASE 11: Oportunidades de reposición cruzando stock bajo con ofertas activas de mayoristas
@@ -103,6 +103,7 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
   
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
+  const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [category, setCategory] = useState('Todos');
   const [subcategory, setSubcategory] = useState('Todas');
   
@@ -242,14 +243,16 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
        setSelectedUserForLogin(null);
        setLoginPin('');
        setPinError(false);
+       setActiveModal('cajaOpenSuccess');
     } else if (cajaOperationType === 'deposit') {
        const movement = { id: Date.now(), type: 'deposit', amount, motivo: cajaMotivo || 'Sin motivo', date: new Date().toISOString(), user: userName };
        updateCaja({ efectivo: caja.efectivo + amount, movimientos: [...(caja.movimientos || []), movement] });
+       setActiveModal(null);
     } else if (cajaOperationType === 'withdraw') {
        const movement = { id: Date.now(), type: 'withdraw', amount, motivo: cajaMotivo || 'Sin motivo', date: new Date().toISOString(), user: userName };
        updateCaja({ efectivo: Math.max(0, caja.efectivo - amount), movimientos: [...(caja.movimientos || []), movement] });
+       setActiveModal(null);
     }
-    setActiveModal(null);
     setCajaAmount('');
     setCajaMotivo('');
   };
@@ -480,6 +483,12 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
       }
 
       if (e.key === 'Enter') {
+        if (activeModal === 'cajaOpenSuccess') {
+          e.preventDefault();
+          setActiveModal(null);
+          setTimeout(() => document.getElementById('pos-search-input')?.focus(), 50);
+          return;
+        }
         if (activeModal === 'success') {
           e.preventDefault();
           setActiveModal(null);
@@ -498,6 +507,11 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
             processSale();
             lastEnterRef.current = 0;
           }
+          return;
+        }
+
+        // Si el foco está en un input o selector, no ejecutar doble Enter de cobro
+        if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
           return;
         }
 
@@ -835,13 +849,26 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
   }, [sales]);
 
   let filteredProducts = products.filter(p => {
-    const matchCat = category === 'Todos' || p.category === category;
-    const matchSub = subcategory === 'Todas' || p.subcategory === subcategory;
-    const matchSearch = !search || p.name.toLowerCase().startsWith(search.toLowerCase()) || (p.code && p.code.startsWith(search));
-    return matchCat && matchSub && matchSearch && p.isActive;
+    if (!search) {
+      const matchCat = category === 'Todos' || p.category === category;
+      const matchSub = subcategory === 'Todas' || p.subcategory === subcategory;
+      return matchCat && matchSub && p.isActive;
+    }
+    const searchLower = search.toLowerCase().trim();
+    const matchSearch = p.name.toLowerCase().includes(searchLower) || 
+      (p.code && p.code.toLowerCase().includes(searchLower)) ||
+      (p.sku && p.sku.toLowerCase().includes(searchLower));
+    return matchSearch && p.isActive;
   });
 
   filteredProducts = filteredProducts.sort((a, b) => {
+    if (search) {
+      const searchLower = search.toLowerCase().trim();
+      const aStarts = a.name.toLowerCase().startsWith(searchLower) || (a.code && a.code.startsWith(searchLower));
+      const bStarts = b.name.toLowerCase().startsWith(searchLower) || (b.code && b.code.startsWith(searchLower));
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+    }
     const countA = productSalesCount[a.id] || 0;
     const countB = productSalesCount[b.id] || 0;
     return countB - countA;
@@ -1090,31 +1117,62 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
                          onChange={(e) => {
                            const val = e.target.value;
                            setSearch(val);
+                           setSelectedSearchIndex(0);
                            // Agregar al carrito inmediatamente si hay coincidencia exacta del código
                            if (val.trim() !== '') {
                              const exactMatch = products.find(p => (p.code === val.trim() || p.sku === val.trim()) && p.isActive);
                              if (exactMatch) {
                                addToCart(exactMatch);
                                setSearch('');
+                               setSelectedSearchIndex(0);
                              }
                            }
                          }}
                          onKeyDown={(e) => {
-                           if(e.key === 'Enter') {
+                           if (e.key === 'ArrowDown') {
+                             if (filteredProducts.length > 0) {
+                               e.preventDefault();
+                               setSelectedSearchIndex(prev => (prev + 1) % filteredProducts.length);
+                             }
+                             return;
+                           }
+                           if (e.key === 'ArrowUp') {
+                             if (filteredProducts.length > 0) {
+                               e.preventDefault();
+                               setSelectedSearchIndex(prev => (prev - 1 + filteredProducts.length) % filteredProducts.length);
+                             }
+                             return;
+                           }
+                           if (e.key === 'Enter') {
                              const val = e.target.value.trim();
-                             if(val) {
-                               const match = products.find(p => (p.code === val || p.sku === val || p.name.toLowerCase() === val.toLowerCase()) && p.isActive);
-                               if(match) {
+                             if (val) {
+                               e.preventDefault();
+                               e.stopPropagation();
+
+                               // 1. Si hay opciones mostradas en el dropdown filtrado, tomar la opción seleccionada o la primera
+                               if (filteredProducts.length > 0) {
+                                 const targetIndex = (selectedSearchIndex >= 0 && selectedSearchIndex < filteredProducts.length)
+                                   ? selectedSearchIndex
+                                   : 0;
+                                 addToCart(filteredProducts[targetIndex]);
+                                 setSearch('');
+                                 setSelectedSearchIndex(0);
+                                 return;
+                               }
+
+                               // 2. Si no hay dropdown pero coincide por código, SKU o nombre completo exacto o parcial
+                               const match = products.find(p => (p.code === val || p.sku === val || p.name.toLowerCase() === val.toLowerCase() || p.name.toLowerCase().includes(val.toLowerCase())) && p.isActive);
+                               if (match) {
                                  addToCart(match);
                                  setSearch('');
+                                 setSelectedSearchIndex(0);
                                }
-                               e.stopPropagation();
                              }
                            }
                          }}
                       />
                       {search && (
-                        <button className="btn-icon" style={{ padding: '4px', marginRight: '8px' }} onClick={() => setSearch('')}>
+                        <button className="btn-icon" style={{ padding: '4px', marginRight: '8px' }} onClick={() => { setSearch(''); setSelectedSearchIndex(0); }}>
                           <X size={18} />
                         </button>
                       )}
@@ -1123,16 +1181,32 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
                       </button>
                   </div>
                   {search && filteredProducts.length > 0 && !products.find(p => (p.code === search || p.sku === search) && p.isActive) && (
-                     <div style={{ position: 'absolute', top: '100%', left: '16px', right: '16px', zIndex: 10, backgroundColor: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', maxHeight: '300px', overflowY: 'auto', marginTop: '4px' }}>
-                        {filteredProducts.map(item => (
-                           <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }} onClick={() => { addToCart(item); setSearch(''); document.getElementById('pos-search-input')?.focus(); }}>
-                              <div>
-                                 <div style={{ fontWeight: 600 }}>{item.code || item.sku} - {item.name}</div>
-                                 <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Stock: {getDisplayStock(item)} en {item.category}</div>
+                     <div onMouseDown={e => e.preventDefault()} style={{ position: 'absolute', top: '100%', left: '16px', right: '16px', zIndex: 10, backgroundColor: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', maxHeight: '300px', overflowY: 'auto', marginTop: '4px' }}>
+                        {filteredProducts.map((item, index) => {
+                           const isSelected = index === selectedSearchIndex;
+                           return (
+                              <div 
+                                 key={item.id} 
+                                 style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between', 
+                                    padding: '12px', 
+                                    borderBottom: '1px solid var(--color-border)', 
+                                    cursor: 'pointer',
+                                    backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.12)' : 'white',
+                                    borderLeft: isSelected ? '4px solid var(--color-primary)' : '4px solid transparent'
+                                 }} 
+                                 onMouseEnter={() => setSelectedSearchIndex(index)}
+                                 onClick={() => { addToCart(item); setSearch(''); setSelectedSearchIndex(0); document.getElementById('pos-search-input')?.focus(); }}
+                              >
+                                 <div>
+                                    <div style={{ fontWeight: isSelected ? 700 : 600, color: isSelected ? 'var(--color-primary)' : 'inherit' }}>{item.code || item.sku} - {item.name}</div>
+                                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Stock: {getDisplayStock(item)} en {item.category}</div>
+                                 </div>
+                                 <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '16px' }}>{formatCur(item.price)}</div>
                               </div>
-                              <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '16px' }}>{formatCur(item.price)}</div>
-                           </div>
-                        ))}
+                           );
+                        })}
                      </div>
                   )}
               </div>
@@ -1862,6 +1936,24 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
           >
              Confirmar Pago
           </button>
+        </Modal>
+      )}
+
+      {/* Modal Caja Abierta con Éxito */}
+      {activeModal === 'cajaOpenSuccess' && (
+        <Modal title="" onClose={() => { setActiveModal(null); setTimeout(() => document.getElementById('pos-search-input')?.focus(), 50); }}>
+          <div style={{ textAlign: 'center', padding: '12px 8px' }}>
+            <div className="success-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle2 size={32} color="#34a853" />
+              </div>
+            </div>
+            <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px', color: '#1a1f36' }}>¡Caja abierta con éxito!</h2>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '15px' }}>Ya puedes registrar tus ventas en el sistema.</p>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px', borderRadius: '8px', fontWeight: 600 }} onClick={() => { setActiveModal(null); setTimeout(() => document.getElementById('pos-search-input')?.focus(), 50); }}>
+              Comenzar a Vender
+            </button>
+          </div>
         </Modal>
       )}
 

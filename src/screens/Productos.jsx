@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Filter, Download, Upload, Package, MoreHorizontal, ArrowLeft, Shuffle, Settings, Save, X, Edit2, Trash2, Plus, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Bell, Eye, ChevronDown, Smile } from 'lucide-react';
+import { Search, Filter, Download, Upload, Package, MoreHorizontal, ArrowLeft, Shuffle, Settings, Save, X, Edit2, Trash2, Plus, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Bell, Eye, ChevronDown, Smile, CheckCircle2 } from 'lucide-react';
 import { NICHES } from '../utils/mockData';
 import * as xlsx from 'xlsx';
 
@@ -463,6 +463,7 @@ const Productos = ({ kiosco }) => {
   
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showSupplierSuccessModal, setShowSupplierSuccessModal] = useState(false);
   const [newSupplier, setNewSupplier] = useState({ name: '', phone: '', email: '', address: '' });
   const [editingSupplierId, setEditingSupplierId] = useState(null);
   const [editSupplier, setEditSupplier] = useState({ name: '', phone: '', email: '', address: '' });
@@ -717,6 +718,7 @@ const Productos = ({ kiosco }) => {
     setSuppliers([...suppliers, { id: Date.now(), ...newSupplier, name: newName }]);
     handleInputChange('supplierId', newName);
     setNewSupplier({ name: '', phone: '', email: '', address: '' });
+    setShowSupplierSuccessModal(true);
   };
 
   const handleUpdateSupplier = (id) => {
@@ -810,6 +812,8 @@ const Productos = ({ kiosco }) => {
       code: formData.sku,
       category: formData.category,
       subcategory: formData.subcategory,
+      stock: formData.stock !== '' && formData.stock !== undefined ? Number(formData.stock) : 0,
+      stockAlert: formData.stockAlert !== '' && formData.stockAlert !== undefined ? Number(formData.stockAlert) : 5,
       dismissExpirationAlert: isNewDate ? false : (formData.dismissExpirationAlert || false)
     };
 
@@ -2218,6 +2222,28 @@ const Productos = ({ kiosco }) => {
       {renderCreateProductModal()}
       {renderCreateComboModal()}
       {showSupplierModal && renderSupplierModal()}
+
+      {/* Modal Proveedor Creado con Éxito */}
+      {showSupplierSuccessModal && (
+        <div className="modal-overlay" onClick={() => setShowSupplierSuccessModal(false)} style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '400px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '24px', animation: 'scaleIn 0.2s ease-out' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(52, 168, 83, 0.1)', marginBottom: '16px' }}>
+                <CheckCircle2 size={28} color="#34a853" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px 0', color: '#1a1f36' }}>¡Proveedor Creado!</h3>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: '1.5', margin: 0 }}>
+                Proveedor creado con éxito.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button className="btn btn-primary" style={{ padding: '12px 32px', borderRadius: '8px', fontWeight: 600 }} onClick={() => setShowSupplierSuccessModal(false)}>
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTopSellersModal && (
         <Modal title="Productos Más Vendidos" onClose={() => setShowTopSellersModal(false)} minWidth="500px">

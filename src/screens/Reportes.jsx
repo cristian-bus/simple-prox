@@ -1,6 +1,6 @@
 // src/screens/Reportes.jsx
 import React, { useState } from 'react';
-import { DollarSign, ShoppingBag, Package, X, FileText, ChevronLeft, ChevronRight, Archive, Calendar, AlertTriangle } from 'lucide-react';
+import { DollarSign, ShoppingBag, Package, X, FileText, ChevronLeft, ChevronRight, Archive, Calendar, AlertTriangle, TrendingUp, Filter } from 'lucide-react';
 
 const formatCur = (num) => `$ ${num.toLocaleString('es-AR')}`;
 
@@ -28,6 +28,7 @@ const Reportes = ({ kiosco }) => {
   const [profitStartDate, setProfitStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [profitEndDate, setProfitEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [filterPeriod, setFilterPeriod] = useState(caja.isOpen ? 'current_shift' : 'all_time');
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [filterMethod, setFilterMethod] = useState('Todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSale, setSelectedSale] = useState(null);
@@ -46,6 +47,17 @@ const Reportes = ({ kiosco }) => {
   
   if (filterPeriod === 'current_shift' && caja.isOpen && caja.openedTimestamp) {
     filteredSales = filteredSales.filter(s => new Date(s.date).getTime() >= caja.openedTimestamp);
+  } else if (filterPeriod === 'specific_date' && filterDate) {
+    const [targetYear, targetMonth, targetDay] = filterDate.split('-').map(Number);
+    filteredSales = filteredSales.filter(s => {
+      if (!s.date) return false;
+      const d = new Date(s.date);
+      return (
+        d.getFullYear() === targetYear &&
+        d.getMonth() === targetMonth - 1 &&
+        d.getDate() === targetDay
+      );
+    });
   }
 
   if (filterMethod !== 'Todos') {
@@ -55,7 +67,7 @@ const Reportes = ({ kiosco }) => {
   // Cálculos dinámicos
   const totalVentas = filteredSales.reduce((acc, s) => acc + s.total, 0);
   const totalOperaciones = filteredSales.length;
-  const productosBajos = products.filter(p => p.isActive && !p.isCombo && p.stock <= (p.stockAlert || 5) && p.stock > 0).length;
+  const productosBajos = products.filter(p => p.isActive && !p.isCombo && Number(p.stock) <= (p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5) && Number(p.stock) > 0).length;
 
   // Paginación Ventas
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / ITEMS_PER_PAGE));
@@ -108,42 +120,102 @@ const Reportes = ({ kiosco }) => {
 
       {reportView === 'sales' && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px', gap: '8px' }}>
-              <select 
-                 className="input" 
-                 style={{ padding: '8px 12px', minWidth: '150px' }}
-                 value={filterMethod}
-                 onChange={e => { 
-                   setFilterMethod(e.target.value); 
-                   setCurrentPage(1); 
-                 }}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '20px', 
+            gap: '16px', 
+            flexWrap: 'wrap',
+            padding: '12px 16px',
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: '12px',
+            border: '1px solid var(--color-border)'
+          }}>
+            {/* Herramienta de Análisis: Rentabilidad Neta */}
+            <div>
+              <button 
+                className="btn" 
+                onClick={() => {
+                  if (kiosco.businessConfig?.plan !== 'Pro') {
+                    setAlertMessage("La Calculadora de Rentabilidad Neta es una función exclusiva del Plan Pro. Te permite conocer la ganancia real de tu negocio restando los costos de compra a tus ventas totales.");
+                    setActiveModal('alert');
+                  } else {
+                    setShowProfitModal(true);
+                  }
+                }} 
+                style={{ 
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)', 
+                  borderColor: 'rgba(16, 185, 129, 0.25)', 
+                  color: '#059669', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+                title="Calcular la ganancia neta real (Ventas menos Costos de compra)"
               >
-                <option value="Todos">Todos los Medios</option>
-                <option value="Efectivo">Efectivo</option>
-                <option value="Tarjeta">Tarjeta</option>
-                <option value="Transferencia">Transferencia</option>
-                <option value="QR">QR</option>
-                <option value="Fiado">Fiado</option>
-              </select>
-              <button className="btn btn-primary" onClick={() => {
-                if (kiosco.businessConfig?.plan !== 'Pro') {
-                  setAlertMessage("La Rentabilidad Neta es una función exclusiva del Plan Pro. Ve a Configuración para actualizar tu plan.");
-                  setActiveModal('alert');
-                } else {
-                  setShowProfitModal(true);
-                }
-              }} style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                 <DollarSign size={16} /> Rentabilidad Neta (Pro)
+                <TrendingUp size={16} />
+                <span>Calcular Rentabilidad / Ganancia Real {kiosco.businessConfig?.plan !== 'Pro' ? '(Pro)' : ''}</span>
               </button>
-            <select 
-               className="input" 
-               style={{ padding: '8px 12px', minWidth: '150px' }}
-               value={filterPeriod}
-               onChange={e => { setFilterPeriod(e.target.value); setCurrentPage(1); }}
-            >
-              <option value="all_time">Operación Histórica Total</option>
-              {caja.isOpen && <option value="current_shift">Turno en Curso (Actual)</option>}
-            </select>
+            </div>
+
+            {/* Grupo de Filtros del Panel */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              {/* Filtro por Período */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={14} /> Período:
+                </span>
+                <select 
+                  className="input" 
+                  style={{ padding: '7px 12px', minWidth: '150px', marginBottom: 0, fontSize: '13px' }}
+                  value={filterPeriod}
+                  onChange={e => { setFilterPeriod(e.target.value); setCurrentPage(1); }}
+                >
+                  <option value="all_time">Histórico Total</option>
+                  {caja.isOpen && <option value="current_shift">Turno en Curso (Actual)</option>}
+                  <option value="specific_date">Por Día Específico</option>
+                </select>
+                {filterPeriod === 'specific_date' && (
+                  <input 
+                    type="date" 
+                    className="input" 
+                    style={{ padding: '6px 10px', minWidth: '130px', fontWeight: 500, marginBottom: 0, fontSize: '13px' }}
+                    value={filterDate}
+                    onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }}
+                    title="Seleccionar fecha"
+                  />
+                )}
+              </div>
+
+              {/* Filtro por Medio de Pago */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Filter size={14} /> Medio:
+                </span>
+                <select 
+                  className="input" 
+                  style={{ padding: '7px 12px', minWidth: '135px', marginBottom: 0, fontSize: '13px' }}
+                  value={filterMethod}
+                  onChange={e => { 
+                    setFilterMethod(e.target.value); 
+                    setCurrentPage(1); 
+                  }}
+                >
+                  <option value="Todos">Todos</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Tarjeta">Tarjeta</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="QR">QR</option>
+                  <option value="Fiado">Fiado</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
@@ -211,7 +283,16 @@ const Reportes = ({ kiosco }) => {
           {activeList === 'ventas' && (
           <div className="card">
             <h2 className="card-title">Listado de Ventas</h2>
-            <p className="card-subtitle">{filterPeriod === 'current_shift' ? 'Ventas operadas en el turno actual' : 'Registro de todas las ventas históricas'}</p>
+            <p className="card-subtitle">
+              {filterPeriod === 'current_shift' 
+                ? 'Ventas operadas en el turno actual' 
+                : (filterPeriod === 'specific_date' && filterDate
+                    ? (() => {
+                        const [y, m, d] = filterDate.split('-').map(Number);
+                        return `Ventas del día ${new Date(y, m - 1, d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+                      })()
+                    : 'Registro de todas las ventas históricas')}
+            </p>
             
             <div className="table-container">
               <table>
@@ -256,7 +337,9 @@ const Reportes = ({ kiosco }) => {
                   })}
                   {paginatedSales.length === 0 && (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>No hay ventas registradas en este período</td>
+                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>
+                        {filterPeriod === 'specific_date' ? 'No se registraron ventas en la fecha seleccionada' : 'No hay ventas registradas en este período'}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -685,12 +768,58 @@ const Reportes = ({ kiosco }) => {
 
       {/* Rentabilidad Neta Modal */}
       {showProfitModal && (
-        <Modal title="Rentabilidad Neta (Pro)" onClose={() => setShowProfitModal(false)}>
-          <div style={{ minWidth: '400px', marginBottom: '16px' }}>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: '16px' }}>
-              Calcula la rentabilidad neta en un rango de fechas seleccionado.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+        <Modal title="Análisis de Rentabilidad y Ganancia Neta (Pro)" onClose={() => setShowProfitModal(false)}>
+          <div style={{ minWidth: '420px', marginBottom: '16px' }}>
+            <div style={{ backgroundColor: 'rgba(66, 133, 244, 0.06)', padding: '12px 14px', borderRadius: '8px', border: '1px solid rgba(66, 133, 244, 0.2)', marginBottom: '16px' }}>
+              <p style={{ color: '#1a1f36', fontSize: '13px', margin: 0, lineHeight: 1.4 }}>
+                <strong>¿Cómo funciona?</strong> Compara los ingresos cobrados por tus ventas contra el costo de compra de cada producto, mostrándote el <strong>dinero limpio</strong> ganado y tu margen de ganancia.
+              </p>
+            </div>
+
+            {/* Accesos rápidos de rango */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Atajos:</span>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ padding: '3px 8px', fontSize: '12px' }}
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setProfitStartDate(today);
+                  setProfitEndDate(today);
+                }}
+              >
+                Hoy
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ padding: '3px 8px', fontSize: '12px' }}
+                onClick={() => {
+                  const today = new Date();
+                  const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  setProfitStartDate(past.toISOString().split('T')[0]);
+                  setProfitEndDate(today.toISOString().split('T')[0]);
+                }}
+              >
+                Últimos 7 días
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ padding: '3px 8px', fontSize: '12px' }}
+                onClick={() => {
+                  const today = new Date();
+                  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                  setProfitStartDate(firstDay.toISOString().split('T')[0]);
+                  setProfitEndDate(today.toISOString().split('T')[0]);
+                }}
+              >
+                Este Mes
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>DESDE</label>
                 <input type="date" className="input" value={profitStartDate} onChange={e => setProfitStartDate(e.target.value)} style={{ padding: '8px 12px', width: '100%', borderRadius: '8px' }} />
@@ -736,19 +865,26 @@ const Reportes = ({ kiosco }) => {
               
               return (
                 <div style={{ backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed var(--color-border)' }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>Ventas Totales:</span>
-                    <span style={{ fontWeight: 600 }}>{formatCur(totalRevenue)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px dashed var(--color-border)' }}>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Ventas Totales (Facturación):</span>
+                    <span style={{ fontWeight: 600, fontSize: '14px' }}>{formatCur(totalRevenue)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed var(--color-border)' }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>Costo Total de Ventas:</span>
-                    <span style={{ fontWeight: 600 }}>{formatCur(totalCost)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px dashed var(--color-border)' }}>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Costo Total de Mercadería Vendida:</span>
+                    <span style={{ fontWeight: 600, fontSize: '14px' }}>{formatCur(totalCost)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, color: '#1a1f36' }}>Ganancia Neta:</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px dashed var(--color-border)' }}>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Tickets / Ventas Analizadas:</span>
+                    <span style={{ fontWeight: 600, fontSize: '14px' }}>{relevantSales.length} operaciones</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                    <div>
+                      <span style={{ fontWeight: 700, color: '#1a1f36', fontSize: '15px', display: 'block' }}>Ganancia Neta Real:</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Dinero limpio generado</span>
+                    </div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ display: 'block', fontSize: '24px', fontWeight: 800, color: '#10b981' }}>{formatCur(netProfit)}</span>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Margen Promedio: {marginPercent.toFixed(1)}%</span>
+                      <span style={{ fontSize: '12px', color: '#059669', fontWeight: 700 }}>Margen Promedio: {marginPercent.toFixed(1)}%</span>
                     </div>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
 {
   "name": "simple-prox",
   "private": true,
-  "version": "1.3.8",
+  "version": "1.3.9",
   "author": "Simple ProX",
   "description": "Sistema Simple ProX Desktop",
   "type": "module",
@@ -29,6 +29,7 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -43,7 +44,9 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   },
   "dependencies": {

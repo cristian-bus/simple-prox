@@ -216,7 +216,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
             Activación del Sistema
           </h2>
           <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0, lineHeight: 1.4 }}>
-            Para habilitar KioscoProX en este equipo, ingresa los datos del comercio y la Clave Maestra de Administrador.
+            Para habilitar Simple ProX en este equipo, ingresa los datos del comercio y la Clave Maestra de Administrador.
           </p>
         </div>
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KioscoProX - Panel Administrador B2B</title>
+  <title>Simple ProX - Panel Administrador B2B</title>
   <!-- Google Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -411,6 +411,56 @@
       background: rgba(255, 255, 255, 0.25);
       color: #ffffff;
       border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Filter Modal Picker */
+    .filter-modal-btn {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      cursor: pointer !important;
+      text-align: left !important;
+      transition: all 0.15s ease !important;
+      user-select: none !important;
+      border: 1px solid rgba(148, 163, 184, 0.2) !important;
+      background: rgba(30, 41, 59, 0.7) !important;
+      color: #cbd5e1 !important;
+      box-sizing: border-box !important;
+    }
+    .filter-modal-btn:hover:not(:disabled) {
+      background: rgba(51, 65, 85, 0.85) !important;
+      border-color: rgba(56, 189, 248, 0.4) !important;
+      color: #ffffff !important;
+    }
+    .filter-picker-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(15, 23, 42, 0.6);
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .filter-picker-item:hover {
+      background: rgba(51, 65, 85, 0.85) !important;
+      border-color: rgba(56, 189, 248, 0.4) !important;
+      color: #ffffff !important;
+    }
+    .filter-picker-item.active {
+      border-color: var(--primary) !important;
+      background: rgba(37, 99, 235, 0.2) !important;
+      color: #ffffff !important;
+      font-weight: 700 !important;
     }
 
     .geo-chip {
@@ -908,7 +958,7 @@
   <div id="auth-overlay" style="display: none;">
     <div class="auth-card">
       <div class="brand-icon" style="margin: 0 auto 16px;">SPX</div>
-      <h2 style="margin-bottom: 8px;">KioscoProX B2B</h2>
+      <h2 style="margin-bottom: 8px;">Simple ProX B2B</h2>
       <p style="color: var(--text-muted); margin-bottom: 24px; font-size: 14px;">Inicia sesión para administrar el sistema</p>
       <input type="email" id="auth-email" class="auth-input" placeholder="Correo electrónico" />
       <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" />
@@ -925,7 +975,7 @@
         <i data-lucide="shopping-bag"></i>
       </div>
       <div>
-        <div class="brand-title">KioscoProX</div>
+        <div class="brand-title">Simple ProX</div>
         <div class="brand-subtitle">Panel B2B Mayorista</div>
       </div>
     </div>
@@ -973,7 +1023,7 @@
     <header>
       <div class="header-title">
         <h1 id="tab-title">Campañas Publicitarias B2B</h1>
-        <p id="tab-subtitle">Administra y programa promociones visibles en la red de comercios KioscoProX</p>
+        <p id="tab-subtitle">Administra y programa promociones visibles en la red de comercios Simple ProX</p>
       </div>
 
       <button class="btn btn-primary" id="btn-header-new-campaign" onclick="openCreateModal()">
@@ -1046,64 +1096,83 @@
           </div>
 
           <!-- Barra de Filtros y Búsqueda -->
-          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
-              <div style="position: relative; width: 220px; flex-shrink: 0;">
-                <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
-                <input type="text" id="campaign-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar campaña o código..." oninput="applyCampaignFilters()">
+          <div class="filters-box" style="background: rgba(15, 23, 42, 0.45); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Fila 1: Búsqueda y Filtros de Segmentación -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <div style="position: relative; flex: 1; min-width: 240px; max-width: 360px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #64748b; pointer-events: none;"></i>
+                <input type="text" id="campaign-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 36px; height: 38px; font-size: 13px; border-radius: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(148, 163, 184, 0.2);" placeholder="Buscar campaña o código..." oninput="applyCampaignFilters()">
               </div>
 
-              <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                <button class="filter-pill active" onclick="setCampaignStatusFilter('all', this)">Todas <span class="pill-count" id="count-campaigns-all">0</span></button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('active', this)">🟢 Activas <span class="pill-count" id="count-campaigns-active">0</span></button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('scheduled', this)">🟡 Programadas <span class="pill-count" id="count-campaigns-scheduled">0</span></button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('paused', this)">⏸ Pausadas <span class="pill-count" id="count-campaigns-paused">0</span></button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('finished', this)">🔴 Finalizadas <span class="pill-count" id="count-campaigns-finished">0</span></button>
-                <button class="filter-pill" onclick="setCampaignStatusFilter('draft', this)">📝 Borradores <span class="pill-count" id="count-campaigns-draft">0</span></button>
+                <button type="button" id="btn-picker-filter-campaign-province" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-campaign-province', 'Seleccionar Provincia', 'map-pin')" style="min-width: 165px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las provincias</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-campaign-province" style="display: none;" onchange="handleCampaignProvinceFilterChange()">
+                  <option value="all">Todas las provincias</option>
+                  <option value="ALL">🌐 Cobertura Nacional</option>
+                  <option value="AR-D">📍 San Luis</option>
+                  <option value="AR-X">📍 Córdoba</option>
+                  <option value="AR-B">📍 Buenos Aires</option>
+                  <option value="AR-C">📍 CABA</option>
+                  <option value="AR-M">📍 Mendoza</option>
+                  <option value="AR-S">📍 Santa Fe</option>
+                  <option value="AR-T">📍 Tucumán</option>
+                  <option value="AR-E">📍 Entre Ríos</option>
+                  <option value="AR-W">📍 Corrientes</option>
+                  <option value="AR-N">📍 Misiones</option>
+                  <option value="AR-H">📍 Chaco</option>
+                  <option value="AR-P">📍 Formosa</option>
+                  <option value="AR-G">📍 Santiago del Estero</option>
+                  <option value="AR-K">📍 Catamarca</option>
+                  <option value="AR-F">📍 La Rioja</option>
+                  <option value="AR-J">📍 San Juan</option>
+                  <option value="AR-L">📍 La Pampa</option>
+                  <option value="AR-Q">📍 Neuquén</option>
+                  <option value="AR-R">📍 Río Negro</option>
+                  <option value="AR-U">📍 Chubut</option>
+                  <option value="AR-Z">📍 Santa Cruz</option>
+                  <option value="AR-V">📍 Tierra del Fuego</option>
+                  <option value="AR-Y">📍 Jujuy</option>
+                  <option value="AR-A">📍 Salta</option>
+                </select>
+
+                <button type="button" id="btn-picker-filter-campaign-city" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-campaign-city', 'Seleccionar Ciudad', 'building-2')" style="min-width: 155px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px; opacity: 0.6; cursor: not-allowed;" disabled>
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las ciudades</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-campaign-city" style="display: none;" disabled onchange="applyCampaignFilters()">
+                  <option value="all">Todas las ciudades</option>
+                </select>
+
+                <button type="button" id="btn-picker-filter-campaign-category" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-campaign-category', 'Seleccionar Categoría', 'tag')" style="min-width: 155px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las categorías</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-campaign-category" style="display: none;" onchange="applyCampaignFilters()">
+                  <option value="all">Todas las categorías</option>
+                </select>
+
+                <button type="button" id="btn-picker-filter-campaign-supplier" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-campaign-supplier', 'Seleccionar Distribuidor', 'truck')" style="min-width: 175px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todos los distribuidores</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-campaign-supplier" style="display: none;" onchange="applyCampaignFilters()">
+                  <option value="all">Todos los distribuidores</option>
+                </select>
               </div>
-            </div>
 
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <select id="filter-campaign-province" class="form-control" style="width: 165px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="handleCampaignProvinceFilterChange()">
-                <option value="all">Todas las provincias</option>
-                <option value="ALL">🌐 Cobertura Nacional</option>
-                <option value="AR-D">📍 San Luis</option>
-                <option value="AR-X">📍 Córdoba</option>
-                <option value="AR-B">📍 Buenos Aires</option>
-                <option value="AR-C">📍 CABA</option>
-                <option value="AR-M">📍 Mendoza</option>
-                <option value="AR-S">📍 Santa Fe</option>
-                <option value="AR-T">📍 Tucumán</option>
-                <option value="AR-E">📍 Entre Ríos</option>
-                <option value="AR-W">📍 Corrientes</option>
-                <option value="AR-N">📍 Misiones</option>
-                <option value="AR-H">📍 Chaco</option>
-                <option value="AR-P">📍 Formosa</option>
-                <option value="AR-G">📍 Santiago del Estero</option>
-                <option value="AR-K">📍 Catamarca</option>
-                <option value="AR-F">📍 La Rioja</option>
-                <option value="AR-J">📍 San Juan</option>
-                <option value="AR-L">📍 La Pampa</option>
-                <option value="AR-Q">📍 Neuquén</option>
-                <option value="AR-R">📍 Río Negro</option>
-                <option value="AR-U">📍 Chubut</option>
-                <option value="AR-Z">📍 Santa Cruz</option>
-                <option value="AR-V">📍 Tierra del Fuego</option>
-                <option value="AR-Y">📍 Jujuy</option>
-                <option value="AR-A">📍 Salta</option>
-              </select>
-
-              <select id="filter-campaign-city" class="form-control" style="width: 155px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px; opacity: 0.6;" disabled onchange="applyCampaignFilters()">
-                <option value="all">Todas las ciudades</option>
-              </select>
-
-              <select id="filter-campaign-category" class="form-control" style="width: 145px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="applyCampaignFilters()">
-                <option value="all">Todas las categorías</option>
-              </select>
-
-              <select id="filter-campaign-supplier" class="form-control" style="width: 165px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="applyCampaignFilters()">
-                <option value="all">Todos los distribuidores</option>
-              </select>
+            <!-- Fila 2: Filtros Rápidos de Estado (Pills) -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="filter" style="width: 12px; height: 12px; color: #38bdf8;"></i> Estado:
+              </span>
+              <button class="filter-pill active" onclick="setCampaignStatusFilter('all', this)">Todas <span class="pill-count" id="count-campaigns-all">0</span></button>
+              <button class="filter-pill" onclick="setCampaignStatusFilter('active', this)">🟢 Activas <span class="pill-count" id="count-campaigns-active">0</span></button>
+              <button class="filter-pill" onclick="setCampaignStatusFilter('scheduled', this)">🟡 Programadas <span class="pill-count" id="count-campaigns-scheduled">0</span></button>
+              <button class="filter-pill" onclick="setCampaignStatusFilter('paused', this)">⏸ Pausadas <span class="pill-count" id="count-campaigns-paused">0</span></button>
+              <button class="filter-pill" onclick="setCampaignStatusFilter('finished', this)">🔴 Finalizadas <span class="pill-count" id="count-campaigns-finished">0</span></button>
+              <button class="filter-pill" onclick="setCampaignStatusFilter('draft', this)">📝 Borradores <span class="pill-count" id="count-campaigns-draft">0</span></button>
             </div>
           </div>
 
@@ -1208,30 +1277,50 @@
           </div>
 
           <!-- Barra de Filtros y Búsqueda -->
-          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
-              <div style="position: relative; width: 220px; flex-shrink: 0;">
-                <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
-                <input type="text" id="merchant-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar comercio..." oninput="filterMerchants()">
+          <div class="filters-box" style="background: rgba(15, 23, 42, 0.45); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Fila 1: Búsqueda y Filtros de Segmentación (Técnico, Provincia, Ciudad) -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <div style="position: relative; flex: 1; min-width: 240px; max-width: 360px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #64748b; pointer-events: none;"></i>
+                <input type="text" id="merchant-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 36px; height: 38px; font-size: 13px; border-radius: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(148, 163, 184, 0.2);" placeholder="Buscar comercio..." oninput="filterMerchants()">
               </div>
 
-              <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                <button class="filter-pill active" onclick="setMerchantFilter('all', this)">Todos <span class="pill-count" id="count-merchants-all">0</span></button>
-                <button class="filter-pill" onclick="setMerchantFilter('active', this)">🟢 Activos <span class="pill-count" id="count-merchants-active">0</span></button>
-                <button class="filter-pill" onclick="setMerchantFilter('pro', this)">⭐ Plan PRO <span class="pill-count" id="count-merchants-pro">0</span></button>
-                <button class="filter-pill" onclick="setMerchantFilter('basic', this)">📦 Básico <span class="pill-count" id="count-merchants-basic">0</span></button>
-                <button class="filter-pill" onclick="setMerchantFilter('updated', this)">🚀 v1.3.8 <span class="pill-count" id="count-merchants-updated">0</span></button>
-                <button class="filter-pill" onclick="setMerchantFilter('outdated', this)">⚠️ Versión Previa <span class="pill-count" id="count-merchants-outdated">0</span></button>
-              </div>
-            </div>
+                <button type="button" id="btn-picker-filter-merchant-installer" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-merchant-installer', 'Seleccionar Técnico Instalador', 'wrench')" style="min-width: 175px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👨‍🔧 Todos los técnicos</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-merchant-installer" style="display: none;" onchange="filterMerchants()">
+                  <option value="all">👨‍🔧 Todos los técnicos</option>
+                </select>
 
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <select id="filter-merchant-province" class="form-control" style="width: 175px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="handleMerchantProvinceChange()">
-                <option value="all">Todas las provincias</option>
-              </select>
-              <select id="filter-merchant-city" class="form-control" style="width: 165px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="filterMerchants()">
-                <option value="all">Todas las ciudades</option>
-              </select>
+                <button type="button" id="btn-picker-filter-merchant-province" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-merchant-province', 'Seleccionar Provincia', 'map-pin')" style="min-width: 175px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las provincias</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-merchant-province" style="display: none;" onchange="handleMerchantProvinceChange()">
+                  <option value="all">Todas las provincias</option>
+                </select>
+
+                <button type="button" id="btn-picker-filter-merchant-city" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-merchant-city', 'Seleccionar Ciudad', 'building-2')" style="min-width: 165px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las ciudades</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-merchant-city" style="display: none;" onchange="filterMerchants()">
+                  <option value="all">Todas las ciudades</option>
+                </select>
+              </div>
+
+            <!-- Fila 2: Filtros Rápidos de Estado / Plan / Versión -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="filter" style="width: 12px; height: 12px; color: #10b981;"></i> Filtro rápido:
+              </span>
+              <button class="filter-pill active" onclick="setMerchantFilter('all', this)">Todos <span class="pill-count" id="count-merchants-all">0</span></button>
+              <button class="filter-pill" onclick="setMerchantFilter('active', this)">🟢 Activos <span class="pill-count" id="count-merchants-active">0</span></button>
+              <button class="filter-pill" onclick="setMerchantFilter('pro', this)">⭐ Plan PRO <span class="pill-count" id="count-merchants-pro">0</span></button>
+              <button class="filter-pill" onclick="setMerchantFilter('basic', this)">📦 Básico <span class="pill-count" id="count-merchants-basic">0</span></button>
+              <button class="filter-pill" onclick="setMerchantFilter('updated', this)">🚀 v1.3.9 <span class="pill-count" id="count-merchants-updated">0</span></button>
+              <button class="filter-pill" onclick="setMerchantFilter('outdated', this)">⚠️ Versión Previa <span class="pill-count" id="count-merchants-outdated">0</span></button>
             </div>
           </div>
 
@@ -1286,61 +1375,78 @@
           </div>
 
           <!-- Barra de Filtros y Búsqueda -->
-          <div class="filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
-              <div style="position: relative; width: 220px; flex-shrink: 0;">
-                <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
-                <input type="text" id="distributor-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 32px; height: 36px; font-size: 12.5px; border-radius: 8px;" placeholder="Buscar distribuidor..." oninput="renderDistributors()">
+          <div class="filters-box" style="background: rgba(15, 23, 42, 0.45); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Fila 1: Búsqueda y Filtros de Segmentación -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <div style="position: relative; flex: 1; min-width: 240px; max-width: 360px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #64748b; pointer-events: none;"></i>
+                <input type="text" id="distributor-search-input" class="form-control" style="box-sizing: border-box; width: 100%; padding: 0 12px 0 36px; height: 38px; font-size: 13px; border-radius: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(148, 163, 184, 0.2);" placeholder="Buscar distribuidor..." oninput="renderDistributors()">
               </div>
 
-              <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                <button class="filter-pill active" onclick="setDistributorStatusFilter('all', this)">Todos <span class="pill-count" id="count-distributors-all">0</span></button>
-                <button class="filter-pill" onclick="setDistributorStatusFilter('national', this)">🌐 Nacionales <span class="pill-count" id="count-distributors-national">0</span></button>
-                <button class="filter-pill" onclick="setDistributorStatusFilter('regional', this)">📍 Provinciales <span class="pill-count" id="count-distributors-regional">0</span></button>
-                <button class="filter-pill" onclick="setDistributorStatusFilter('with-min', this)">💰 Con Mínimo <span class="pill-count" id="count-distributors-with-min">0</span></button>
-                <button class="filter-pill" onclick="setDistributorStatusFilter('no-min', this)">✨ Sin Mínimo <span class="pill-count" id="count-distributors-no-min">0</span></button>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 2; justify-content: flex-end;">
+                <button type="button" id="btn-picker-filter-distributor-province" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-distributor-province', 'Seleccionar Provincia', 'map-pin')" style="min-width: 175px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las provincias</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-distributor-province" style="display: none;" onchange="handleDistributorProvinceFilterChange()">
+                  <option value="all">Todas las provincias</option>
+                  <option value="ALL">🌐 Cobertura Nacional</option>
+                  <option value="AR-X">📍 Córdoba</option>
+                  <option value="AR-D">📍 San Luis</option>
+                  <option value="AR-B">📍 Buenos Aires</option>
+                  <option value="AR-C">📍 CABA</option>
+                  <option value="AR-M">📍 Mendoza</option>
+                  <option value="AR-S">📍 Santa Fe</option>
+                  <option value="AR-T">📍 Tucumán</option>
+                  <option value="AR-E">📍 Entre Ríos</option>
+                  <option value="AR-W">📍 Corrientes</option>
+                  <option value="AR-N">📍 Misiones</option>
+                  <option value="AR-H">📍 Chaco</option>
+                  <option value="AR-P">📍 Formosa</option>
+                  <option value="AR-G">📍 Santiago del Estero</option>
+                  <option value="AR-K">📍 Catamarca</option>
+                  <option value="AR-F">📍 La Rioja</option>
+                  <option value="AR-J">📍 San Juan</option>
+                  <option value="AR-L">📍 La Pampa</option>
+                  <option value="AR-Q">📍 Neuquén</option>
+                  <option value="AR-R">📍 Río Negro</option>
+                  <option value="AR-U">📍 Chubut</option>
+                  <option value="AR-Z">📍 Santa Cruz</option>
+                  <option value="AR-V">📍 Tierra del Fuego</option>
+                  <option value="AR-Y">📍 Jujuy</option>
+                  <option value="AR-A">📍 Salta</option>
+                </select>
+
+                <button type="button" id="btn-picker-filter-distributor-city" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-distributor-city', 'Seleccionar Ciudad', 'building-2')" style="min-width: 160px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las ciudades</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-distributor-city" style="display: none;" onchange="renderDistributors()">
+                  <option value="all">Todas las ciudades</option>
+                </select>
+
+                <button type="button" id="btn-picker-filter-distributor-category" class="form-control filter-modal-btn" onclick="openFilterPicker('filter-distributor-category', 'Seleccionar Categoría', 'tag')" style="min-width: 155px; height: 38px; font-size: 12.5px; padding: 6px 12px; border-radius: 8px;">
+                  <span class="picker-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todas las categorías</span>
+                  <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0;"></i>
+                </button>
+                <select id="filter-distributor-category" style="display: none;" onchange="renderDistributors()">
+                  <option value="all">Todas las categorías</option>
+                </select>
               </div>
             </div>
 
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <select id="filter-distributor-province" class="form-control" style="width: 175px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="handleDistributorProvinceFilterChange()">
-              <option value="all">Todas las provincias</option>
-              <option value="ALL">🌐 Cobertura Nacional</option>
-              <option value="AR-X">📍 Córdoba</option>
-              <option value="AR-D">📍 San Luis</option>
-              <option value="AR-B">📍 Buenos Aires</option>
-              <option value="AR-C">📍 CABA</option>
-              <option value="AR-M">📍 Mendoza</option>
-              <option value="AR-S">📍 Santa Fe</option>
-              <option value="AR-T">📍 Tucumán</option>
-              <option value="AR-E">📍 Entre Ríos</option>
-              <option value="AR-W">📍 Corrientes</option>
-              <option value="AR-N">📍 Misiones</option>
-              <option value="AR-H">📍 Chaco</option>
-              <option value="AR-P">📍 Formosa</option>
-              <option value="AR-G">📍 Santiago del Estero</option>
-              <option value="AR-K">📍 Catamarca</option>
-              <option value="AR-F">📍 La Rioja</option>
-              <option value="AR-J">📍 San Juan</option>
-              <option value="AR-L">📍 La Pampa</option>
-              <option value="AR-Q">📍 Neuquén</option>
-              <option value="AR-R">📍 Río Negro</option>
-              <option value="AR-U">📍 Chubut</option>
-              <option value="AR-Z">📍 Santa Cruz</option>
-              <option value="AR-V">📍 Tierra del Fuego</option>
-              <option value="AR-Y">📍 Jujuy</option>
-              <option value="AR-A">📍 Salta</option>
-            </select>
-
-            <select id="filter-distributor-city" class="form-control" style="width: 160px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="renderDistributors()">
-              <option value="all">Todas las ciudades</option>
-            </select>
-
-            <select id="filter-distributor-category" class="form-control" style="width: 155px; height: 36px; font-size: 12px; padding: 6px 10px; border-radius: 8px;" onchange="renderDistributors()">
-              <option value="all">Todas las categorías</option>
-            </select>
+            <!-- Fila 2: Filtros Rápidos de Estado (Pills) -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="filter" style="width: 12px; height: 12px; color: #a855f7;"></i> Filtro rápido:
+              </span>
+              <button class="filter-pill active" onclick="setDistributorStatusFilter('all', this)">Todos <span class="pill-count" id="count-distributors-all">0</span></button>
+              <button class="filter-pill" onclick="setDistributorStatusFilter('national', this)">🌐 Nacionales <span class="pill-count" id="count-distributors-national">0</span></button>
+              <button class="filter-pill" onclick="setDistributorStatusFilter('regional', this)">📍 Provinciales <span class="pill-count" id="count-distributors-regional">0</span></button>
+              <button class="filter-pill" onclick="setDistributorStatusFilter('with-min', this)">💰 Con Mínimo <span class="pill-count" id="count-distributors-with-min">0</span></button>
+              <button class="filter-pill" onclick="setDistributorStatusFilter('no-min', this)">✨ Sin Mínimo <span class="pill-count" id="count-distributors-no-min">0</span></button>
+            </div>
           </div>
-        </div>
 
         <div class="table-container">
             <table>
@@ -1812,7 +1918,7 @@
           </div>
           <div>
             <h3 id="merchant-modal-title" style="font-size: 19px; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.3px;">Editar Comercio</h3>
-            <p style="font-size: 12.5px; color: #94a3b8; margin: 3px 0 0 0;">Actualiza los datos del comercio en la red KioscoProX</p>
+            <p style="font-size: 12.5px; color: #94a3b8; margin: 3px 0 0 0;">Actualiza los datos del comercio en la red Simple ProX</p>
           </div>
         </div>
         <button type="button" class="btn-icon-close" onclick="closeMerchantModal()" title="Cerrar">
@@ -1881,6 +1987,37 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL SELECTOR ELEGANTE (PICKER DE LISTAS LARGAS) -->
+  <div id="filter-picker-modal" class="modal-overlay hidden" onclick="if(event.target === this) closeFilterPicker()">
+    <div class="merchant-edit-modal" style="max-width: 440px; width: 92%; padding: 22px; display: flex; flex-direction: column; max-height: 82vh;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center; color: #38bdf8; flex-shrink: 0;">
+            <i id="filter-picker-icon" data-lucide="list-filter" style="width: 18px; height: 18px;"></i>
+          </div>
+          <div>
+            <h3 id="filter-picker-title" style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">Seleccionar Opción</h3>
+            <p id="filter-picker-subtitle" style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Elige una opción para filtrar la tabla</p>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline" style="padding: 6px; border-radius: 8px;" onclick="closeFilterPicker()" title="Cerrar (Esc)">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <!-- Buscador interno en tiempo real dentro del modal -->
+      <div style="position: relative; margin-bottom: 12px;">
+        <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b; pointer-events: none;"></i>
+        <input type="text" id="filter-picker-search" class="form-control" style="width: 100%; box-sizing: border-box; padding: 0 12px 0 34px; height: 38px; font-size: 13px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2);" placeholder="Buscar opción..." oninput="filterPickerOptions()">
+      </div>
+
+      <!-- Lista de Opciones con scroll suave -->
+      <div id="filter-picker-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 2px; max-height: 380px;">
+        <!-- Inyectado dinámicamente -->
+      </div>
     </div>
   </div>
 
@@ -1957,12 +2094,16 @@
       if (typeof fetchCampaignsFromSupabase === 'function') await fetchCampaignsFromSupabase();
       if (typeof renderCampaigns === 'function') renderCampaigns();
       if (typeof updateGlobalStats === 'function') updateGlobalStats();
+      if (typeof syncAllPickerButtons === 'function') syncAllPickerButtons();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       loadSettings();
       setTimeout(checkSession, 500); // Give time to loadSettings to populate inputs
+      setTimeout(() => {
+        if (typeof syncAllPickerButtons === 'function') syncAllPickerButtons();
+      }, 700);
     });
 
     // Variables de Estado
@@ -2032,6 +2173,11 @@
           filterDistCategory.appendChild(opt3);
         }
       });
+
+      if (typeof syncPickerButton === 'function') {
+        syncPickerButton('filter-campaign-category');
+        syncPickerButton('filter-distributor-category');
+      }
     }
 
     // Cargar Distribuidores Centralizados
@@ -2142,6 +2288,10 @@
         filterOpt.textContent = dist.name;
         filterSupplier.appendChild(filterOpt);
       });
+
+      if (typeof syncPickerButton === 'function') {
+        syncPickerButton('filter-campaign-supplier');
+      }
     }
 
     function handleSupplierChange(e) {
@@ -2880,24 +3030,180 @@
       document.getElementById('metric-detail-modal').classList.add('hidden');
     }
 
+    function formatCompactMetric(num) {
+      const n = Number(num) || 0;
+      if (n < 1000) return n.toLocaleString('es-AR');
+      if (n < 1000000) {
+        const k = n / 1000;
+        const formatted = k >= 100 ? Math.round(k) : (k % 1 === 0 ? k : k.toFixed(1).replace(/\.0$/, ''));
+        return formatted + 'K';
+      }
+      const m = n / 1000000;
+      const formatted = m >= 100 ? Math.round(m) : (m % 1 === 0 ? m : m.toFixed(1).replace(/\.0$/, ''));
+      return formatted + 'M';
+    }
+
     function updateGlobalStats() {
       const totalImp = rawEvents.filter(e => e.event_type === 'impression').length;
       const totalCta = rawEvents.filter(e => e.event_type === 'whatsapp_click').length;
       const totalOpens = rawEvents.filter(e => e.event_type === 'offer_open').length;
       const ctr = totalImp ? ((totalCta / totalImp) * 100).toFixed(2) : '0.00';
 
-      document.getElementById('kpi-impressions').innerText = totalImp.toLocaleString('es-AR');
-      document.getElementById('kpi-whatsapp').innerText = totalCta.toLocaleString('es-AR');
-      document.getElementById('kpi-opens').innerText = totalOpens.toLocaleString('es-AR');
-      document.getElementById('kpi-ctr').innerText = ctr + '%';
+      const elImp = document.getElementById('kpi-impressions');
+      if (elImp) {
+        elImp.innerText = formatCompactMetric(totalImp);
+        elImp.title = `${totalImp.toLocaleString('es-AR')} impresiones exactas`;
+        elImp.style.cursor = 'help';
+      }
+
+      const elWa = document.getElementById('kpi-whatsapp');
+      if (elWa) {
+        elWa.innerText = formatCompactMetric(totalCta);
+        elWa.title = `${totalCta.toLocaleString('es-AR')} clics a WhatsApp exactos`;
+        elWa.style.cursor = 'help';
+      }
+
+      const elOp = document.getElementById('kpi-opens');
+      if (elOp) {
+        elOp.innerText = formatCompactMetric(totalOpens);
+        elOp.title = `${totalOpens.toLocaleString('es-AR')} aperturas de ofertas exactas`;
+        elOp.style.cursor = 'help';
+      }
+
+      const elCtr = document.getElementById('kpi-ctr');
+      if (elCtr) {
+        elCtr.innerText = ctr + '%';
+        elCtr.title = `CTR global: ${ctr}% (${totalCta.toLocaleString('es-AR')} clics / ${totalImp.toLocaleString('es-AR')} impresiones)`;
+        elCtr.style.cursor = 'help';
+      }
     }
 
     function setCampaignStatusFilter(status, btn) {
       currentStatusFilter = status;
-      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('#view-campaigns .filter-pill').forEach(p => p.classList.remove('active'));
       if (btn) btn.classList.add('active');
       renderCampaigns();
     }
+
+    // --- SISTEMA UNIVERSAL DE MODAL PICKER PARA FILTROS DE LISTAS LARGAS ---
+    let currentPickerSelectId = null;
+
+    function openFilterPicker(selectId, title = 'Seleccionar Opción', iconName = 'list-filter') {
+      const sel = document.getElementById(selectId);
+      if (!sel || sel.disabled) return;
+      currentPickerSelectId = selectId;
+
+      document.getElementById('filter-picker-title').innerText = title;
+      const iconEl = document.getElementById('filter-picker-icon');
+      if (iconEl) iconEl.setAttribute('data-lucide', iconName);
+
+      const searchInput = document.getElementById('filter-picker-search');
+      if (searchInput) searchInput.value = '';
+
+      const listContainer = document.getElementById('filter-picker-list');
+      if (!listContainer) return;
+      listContainer.innerHTML = '';
+
+      const options = Array.from(sel.options);
+      const currentVal = sel.value;
+
+      if (options.length === 0) {
+        listContainer.innerHTML = '<div style="text-align:center; padding: 24px; color: var(--text-muted); font-size: 13px;">No hay opciones disponibles.</div>';
+      } else {
+        options.forEach(opt => {
+          const isSelected = opt.value === currentVal;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'filter-picker-item' + (isSelected ? ' active' : '');
+          btn.setAttribute('data-value', opt.value);
+          btn.setAttribute('data-text', opt.textContent);
+          btn.onclick = () => selectPickerOption(selectId, opt.value);
+
+          btn.innerHTML = `
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${opt.textContent}</span>
+            ${isSelected ? '<i data-lucide="check" style="width: 16px; height: 16px; color: #38bdf8; flex-shrink: 0;"></i>' : ''}
+          `;
+          listContainer.appendChild(btn);
+        });
+      }
+
+      const modal = document.getElementById('filter-picker-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        setTimeout(() => {
+          if (searchInput) searchInput.focus();
+        }, 50);
+      }
+    }
+
+    function filterPickerOptions() {
+      const query = (document.getElementById('filter-picker-search')?.value || '').toLowerCase().trim();
+      const items = document.querySelectorAll('#filter-picker-list .filter-picker-item');
+      items.forEach(item => {
+        const txt = (item.getAttribute('data-text') || '').toLowerCase();
+        if (!query || txt.includes(query)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    function selectPickerOption(selectId, value) {
+      const sel = document.getElementById(selectId);
+      if (sel) {
+        sel.value = value;
+        syncPickerButton(selectId);
+        if (typeof sel.onchange === 'function') {
+          sel.onchange();
+        } else {
+          sel.dispatchEvent(new Event('change'));
+        }
+      }
+      closeFilterPicker();
+    }
+
+    function closeFilterPicker() {
+      const modal = document.getElementById('filter-picker-modal');
+      if (modal) modal.classList.add('hidden');
+      currentPickerSelectId = null;
+    }
+
+    function syncPickerButton(selectId) {
+      const sel = document.getElementById(selectId);
+      const btn = document.getElementById('btn-picker-' + selectId);
+      if (!sel || !btn) return;
+
+      const labelSpan = btn.querySelector('.picker-label');
+      const selectedOpt = sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+      if (labelSpan && selectedOpt) {
+        labelSpan.textContent = selectedOpt.textContent;
+      }
+
+      if (sel.disabled) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      }
+    }
+
+    function syncAllPickerButtons() {
+      document.querySelectorAll('.filter-modal-btn').forEach(btn => {
+        const selId = btn.id.replace('btn-picker-', '');
+        syncPickerButton(selId);
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeFilterPicker();
+      }
+    });
 
     function handleCampaignProvinceFilterChange() {
       const provSelect = document.getElementById('filter-campaign-province');
@@ -2925,6 +3231,8 @@
         });
       }
 
+      syncPickerButton('filter-campaign-province');
+      syncPickerButton('filter-campaign-city');
       applyCampaignFilters();
     }
 
@@ -3021,7 +3329,7 @@
 
       // Generar filas CSV con BOM (\uFEFF) para compatibilidad inmediata con Excel en español
       let csv = '\uFEFF';
-      csv += `"REPORTE COMERCIAL DE RENDIMIENTO B2B - KIOSCOPROX"\n`;
+      csv += `"REPORTE COMERCIAL DE RENDIMIENTO B2B - SIMPLE PROX"\n`;
       csv += `"Fecha de emisión";"${dateStr} ${timeStr}"\n`;
       csv += `"Período analizado";"${periodName}"\n`;
       csv += `"Total Impresiones";"${totalImp}"\n`;
@@ -3044,7 +3352,7 @@
       const a = document.createElement('a');
       a.href = url;
       const todayISO = now.toISOString().slice(0, 10);
-      a.download = `Reporte_Metricas_KioscoProX_${todayISO}.csv`;
+      a.download = `Reporte_Metricas_SimpleProX_${todayISO}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -3677,6 +3985,7 @@
       if (provSelect.selectedIndex === -1) provSelect.value = 'all';
 
       populateMerchantCityOptions();
+      populateMerchantInstallerOptions();
 
       // Renderizar resumen geográfico interactivo
       if (geoSummary) {
@@ -3695,6 +4004,47 @@
         geoSummary.innerHTML = summaryHtml;
         if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
       }
+
+      syncPickerButton('filter-merchant-installer');
+      syncPickerButton('filter-merchant-province');
+      syncPickerButton('filter-merchant-city');
+    }
+
+    function populateMerchantInstallerOptions() {
+      const instSelect = document.getElementById('filter-merchant-installer');
+      if (!instSelect) return;
+
+      const currentVal = instSelect.value || 'all';
+      const installerMap = new Map();
+      let noInstallerCount = 0;
+
+      merchantsList.forEach(m => {
+        const inst = (m.installer && m.installer.trim()) ? m.installer.trim() : null;
+        if (!inst) {
+          noInstallerCount++;
+        } else {
+          installerMap.set(inst, (installerMap.get(inst) || 0) + 1);
+        }
+      });
+
+      instSelect.innerHTML = '<option value="all">👨‍🔧 Todos los técnicos</option>';
+      Array.from(installerMap.keys()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })).forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = `👨‍🔧 ${name} (${installerMap.get(name)})`;
+        instSelect.appendChild(opt);
+      });
+
+      if (noInstallerCount > 0) {
+        const optNo = document.createElement('option');
+        optNo.value = '__none__';
+        optNo.textContent = `👨‍🔧 Sin técnico especificado (${noInstallerCount})`;
+        instSelect.appendChild(optNo);
+      }
+
+      instSelect.value = currentVal;
+      if (instSelect.selectedIndex === -1) instSelect.value = 'all';
+      syncPickerButton('filter-merchant-installer');
     }
 
     function populateMerchantCityOptions() {
@@ -3729,10 +4079,13 @@
 
       citySelect.value = currentCity;
       if (citySelect.selectedIndex === -1) citySelect.value = 'all';
+      syncPickerButton('filter-merchant-city');
     }
 
     function handleMerchantProvinceChange() {
       populateMerchantCityOptions();
+      syncPickerButton('filter-merchant-province');
+      syncPickerButton('filter-merchant-city');
       filterMerchants();
     }
 
@@ -3742,6 +4095,8 @@
       populateMerchantCityOptions();
       const citySelect = document.getElementById('filter-merchant-city');
       if (citySelect && city !== 'all') citySelect.value = city;
+      syncPickerButton('filter-merchant-province');
+      syncPickerButton('filter-merchant-city');
       filterMerchants();
     }
 
@@ -3755,7 +4110,7 @@
     }
 
     function filterMerchants() {
-      const LATEST_APP_VERSION = '1.3.8';
+      const LATEST_APP_VERSION = '1.3.9';
       const mCounts = {
         all: merchantsList.length,
         active: 0,
@@ -3769,7 +4124,7 @@
         const isAct = (m.status || 'active') === 'active';
         const isPro = (m.plan || '').toLowerCase() === 'pro';
         const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.8';
+        const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.9';
 
         if (isAct) mCounts.active++;
         if (isPro) mCounts.pro++; else mCounts.basic++;
@@ -3792,6 +4147,7 @@
       const query = (document.getElementById('merchant-search-input')?.value || '').toLowerCase().trim();
       const provFilter = document.getElementById('filter-merchant-province')?.value || 'all';
       const cityFilter = document.getElementById('filter-merchant-city')?.value || 'all';
+      const installerFilter = document.getElementById('filter-merchant-installer')?.value || 'all';
 
       const filtered = merchantsList.filter(m => {
         const isAct = (m.status || 'active') === 'active';
@@ -3804,6 +4160,15 @@
         if (currentMerchantFilter === 'basic' && isPro) return false;
         if (currentMerchantFilter === 'updated' && !isUp) return false;
         if (currentMerchantFilter === 'outdated' && isUp) return false;
+
+        if (installerFilter !== 'all') {
+          const inst = (m.installer && m.installer.trim()) ? m.installer.trim() : '';
+          if (installerFilter === '__none__') {
+            if (inst) return false;
+          } else {
+            if (!inst || inst.toLowerCase() !== installerFilter.toLowerCase()) return false;
+          }
+        }
 
         const provName = (m.province_name && m.province_name.trim()) ? m.province_name.trim() : (m.province_code ? m.province_code.trim() : null);
         const cityName = (m.city_name && m.city_name.trim()) ? m.city_name.trim() : ((m.city && m.city.trim() && m.city.toLowerCase() !== 'argentina') ? m.city.trim() : null);
@@ -3845,7 +4210,7 @@
     function renderMerchants(merchants) {
         // Asegurar que los contadores se sincronicen siempre
         const sourceList = (merchantsList && merchantsList.length > 0) ? merchantsList : (merchants || []);
-        const LATEST_APP_VERSION = '1.3.8';
+        const LATEST_APP_VERSION = '1.3.9';
         const mCounts = {
           all: sourceList.length,
           active: 0,
@@ -3859,7 +4224,7 @@
           const isAct = (m.status || 'active') === 'active';
           const isPro = (m.plan || '').toLowerCase() === 'pro';
           const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-          const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.8';
+          const isUp = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.9';
 
           if (isAct) mCounts.active++;
           if (isPro) mCounts.pro++; else mCounts.basic++;
@@ -3928,9 +4293,9 @@
             ? '<a href="https://api.whatsapp.com/send?phone=' + cleanPhone + '" target="_blank" style="color: #10b981; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">📱 ' + m.phone + '</a>' 
             : '<span style="color: var(--text-muted);">-</span>';
 
-          const LATEST_APP_VERSION = '1.3.8';
+          const LATEST_APP_VERSION = '1.3.9';
           const verStr = m.app_version ? (m.app_version.startsWith('v') ? m.app_version : 'v' + m.app_version) : 'v1.0.0';
-          const isUpToDate = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.8';
+          const isUpToDate = verStr.includes(LATEST_APP_VERSION) || verStr >= 'v1.3.9';
           const versionBadge = isUpToDate
             ? `<span style="background: rgba(16, 185, 129, 0.12); color: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">${verStr}</span>`
             : `<span style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;" title="Instalación con versión previa (${verStr}) - Requiere v${LATEST_APP_VERSION}">${verStr} ⚠️</span>`;
@@ -3942,7 +4307,10 @@
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td style="white-space: nowrap;"><code style="background: rgba(59, 130, 246, 0.12); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px;">${m.id}</code></td>
-            <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><strong style="color: var(--text); font-size: 13px;" title="${m.name || 'Sin Nombre'}">${m.name || 'Sin Nombre'}</strong></td>
+            <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <strong style="color: var(--text); font-size: 13px;" title="${m.name || 'Sin Nombre'}">${m.name || 'Sin Nombre'}</strong>
+              ${m.installer ? `<div style="font-size: 10.5px; color: #38bdf8; display: flex; align-items: center; gap: 3px; margin-top: 2px;" title="Técnico instalador: ${m.installer}">👨‍🔧 ${m.installer}</div>` : ''}
+            </td>
             <td style="text-align: center; white-space: nowrap;">${planBadge}</td>
             <td style="white-space: nowrap;">${phoneHtml}</td>
             <td style="font-size: 12px; color: #cbd5e1; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${provStr}">${provStr}</td>
@@ -3998,7 +4366,8 @@
       };
 
       merchantsList = merchantsList.map(m => m.id === id ? { ...m, ...updatedData } : m);
-      renderMerchants(merchantsList);
+      populateMerchantInstallerOptions();
+      filterMerchants();
       closeMerchantModal();
 
       const config = JSON.parse(localStorage.getItem('kioscoprox_ad_config') || '{}');
@@ -4033,7 +4402,8 @@
       if (!confirm(`¿Estás seguro de eliminar el registro del comercio "${name}" (${id})?`)) return;
 
       merchantsList = merchantsList.filter(x => x.id !== id);
-      renderMerchants(merchantsList);
+      populateMerchantInstallerOptions();
+      filterMerchants();
 
       const config = JSON.parse(localStorage.getItem('kioscoprox_ad_config') || '{}');
       const supabaseUrl = config.supabaseUrl || config.apiUrl;
@@ -4067,7 +4437,7 @@
 
       if (tabName === 'campaigns') {
         document.getElementById('tab-title').innerText = 'Campañas Publicitarias B2B';
-        document.getElementById('tab-subtitle').innerText = 'Administra y programa promociones visibles en la red de comercios KioscoProX';
+        document.getElementById('tab-subtitle').innerText = 'Administra y programa promociones visibles en la red de comercios Simple ProX';
         document.getElementById('view-campaigns').classList.remove('hidden');
         document.getElementById('btn-header-new-campaign').style.display = 'inline-flex';
         renderCampaigns();
@@ -4079,7 +4449,7 @@
         renderMetrics();
       } else if (tabName === 'merchants') {
         document.getElementById('tab-title').innerText = 'Comercios Conectados';
-        document.getElementById('tab-subtitle').innerText = 'Lista de kioscos y comercios activos en la red KioscoProX';
+        document.getElementById('tab-subtitle').innerText = 'Lista de kioscos y comercios activos en la red Simple ProX';
         document.getElementById('view-merchants').classList.remove('hidden');
         document.getElementById('btn-header-new-campaign').style.display = 'none';
         if (merchantsList.length === 0) {
@@ -4102,6 +4472,7 @@
         loadSettings();
       }
       lucide.createIcons();
+      if (typeof syncAllPickerButtons === 'function') syncAllPickerButtons();
     }
 
     function saveSettings() {
@@ -4238,9 +4609,11 @@
       } else {
         citySelect.value = 'all';
       }
+      if (typeof syncPickerButton === 'function') syncPickerButton('filter-distributor-city');
     }
 
     function handleDistributorProvinceFilterChange() {
+      if (typeof syncPickerButton === 'function') syncPickerButton('filter-distributor-province');
       populateDistributorCityOptions();
       renderDistributors();
     }
@@ -4554,10 +4927,33 @@
 
       const avgCtr = sumImp > 0 ? ((sumWpp / sumImp) * 100).toFixed(1) : '0.0';
 
-      document.getElementById('perf-kpi-imp').innerText = sumImp.toLocaleString('es-AR');
-      document.getElementById('perf-kpi-opens').innerText = sumOpens.toLocaleString('es-AR');
-      document.getElementById('perf-kpi-wpp').innerText = sumWpp.toLocaleString('es-AR');
-      document.getElementById('perf-kpi-ctr').innerText = `${avgCtr}%`;
+      const elPerfImp = document.getElementById('perf-kpi-imp');
+      if (elPerfImp) {
+        elPerfImp.innerText = formatCompactMetric(sumImp);
+        elPerfImp.title = `${sumImp.toLocaleString('es-AR')} impresiones exactas`;
+        elPerfImp.style.cursor = 'help';
+      }
+
+      const elPerfOpens = document.getElementById('perf-kpi-opens');
+      if (elPerfOpens) {
+        elPerfOpens.innerText = formatCompactMetric(sumOpens);
+        elPerfOpens.title = `${sumOpens.toLocaleString('es-AR')} aperturas exactas`;
+        elPerfOpens.style.cursor = 'help';
+      }
+
+      const elPerfWpp = document.getElementById('perf-kpi-wpp');
+      if (elPerfWpp) {
+        elPerfWpp.innerText = formatCompactMetric(sumWpp);
+        elPerfWpp.title = `${sumWpp.toLocaleString('es-AR')} clics a WhatsApp exactos`;
+        elPerfWpp.style.cursor = 'help';
+      }
+
+      const elPerfCtr = document.getElementById('perf-kpi-ctr');
+      if (elPerfCtr) {
+        elPerfCtr.innerText = `${avgCtr}%`;
+        elPerfCtr.title = `CTR promedio: ${avgCtr}% (${sumWpp.toLocaleString('es-AR')} clics / ${sumImp.toLocaleString('es-AR')} impresiones)`;
+        elPerfCtr.style.cursor = 'help';
+      }
 
       // Actualizar contadores de las pills
       const countAll = campWithMetrics.length;
@@ -4734,7 +5130,7 @@
 
       rows.sort((a, b) => b.metrics.whatsappClicks - a.metrics.whatsappClicks || b.metrics.ctr - a.metrics.ctr);
 
-      let text = `📊 *REPORTE DE RENDIMIENTO B2B - KioscoProX*\n`;
+      let text = `📊 *REPORTE DE RENDIMIENTO B2B - Simple ProX*\n`;
       text += `🏢 *Mayorista:* ${dist.name}\n`;
       text += `📅 *Fecha:* ${today}\n`;
       text += `📍 *Zona:* ${dist.city || 'Nacional'} (${dist.provinceCode || 'ALL'})\n`;
@@ -4757,7 +5153,7 @@
       });
 
       text += `-------------------------------------------\n`;
-      text += `✨ *Red de Publicidad y Ofertas Mayoristas KioscoProX*\n`;
+      text += `✨ *Red de Publicidad y Ofertas Mayoristas Simple ProX*\n`;
       text += `📲 Contacto directo con comercios y kioscos de la red.`;
 
       navigator.clipboard.writeText(text).then(() => {
@@ -4989,6 +5385,7 @@
       await loadDistributors();
       loadSettings();
       fetchCampaignsFromSupabase();
+      if (typeof syncAllPickerButtons === 'function') syncAllPickerButtons();
     })();
   </script>
 </body>

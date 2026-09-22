@@ -17,11 +17,13 @@ const KEYS = {
 
 import { NICHES } from '../utils/mockData';
 import { generate5MonthsDemoData } from '../utils/demoDataGenerator';
-import { getInstallationId, calculateLicenseKey, saveCommerceProfile, getCommerceProfile } from '../services/installationService';
+import { getInstallationId, calculateLicenseKey, isValidLicenseKey, saveCommerceProfile, getCommerceProfile } from '../services/installationService';
 
 export const generateLicenseKey = (installationId) => {
   return calculateLicenseKey(installationId);
 };
+
+export { isValidLicenseKey };
 
 
 export const useKiosco = () => {
@@ -137,8 +139,7 @@ export const useKiosco = () => {
   // Verificación de integridad de licencia
   useEffect(() => {
     if (businessConfig.plan === 'Pro') {
-      const expectedKey = generateLicenseKey(businessConfig.installationId);
-      if (businessConfig.licenseKey !== expectedKey) {
+      if (!isValidLicenseKey(businessConfig.installationId, businessConfig.licenseKey)) {
         console.warn('Licencia inválida o faltante. Revirtiendo a Plan Básico.');
         setBusinessConfig(prev => ({ ...prev, plan: 'Básico' }));
       }

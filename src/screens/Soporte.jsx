@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HelpCircle, MessageCircle, Keyboard, BookOpen, ChevronDown, ChevronUp, FileText, Package, Users, UserCircle, Layers, BarChart2, DollarSign, Calendar, Upload } from 'lucide-react';
+import { HelpCircle, MessageCircle, Keyboard, BookOpen, ChevronDown, ChevronUp, FileText, Package, Users, UserCircle, Layers, DollarSign, Calendar, Upload } from 'lucide-react';
 
 const Soporte = ({ kiosco, setCurrentScreen }) => {
   const [activeTab, setActiveTab] = useState('atajos');
@@ -148,16 +148,6 @@ const Soporte = ({ kiosco, setCurrentScreen }) => {
                 <div>
                   <strong style={{ display: 'block', fontSize: '14px', color: '#fff', marginBottom: '2px' }}>Hasta 5 Usuarios Administrativos</strong>
                   <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.75)' }}>Registra a tus cajeros (el plan básico permite 2).</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <div style={{ background: 'rgba(255, 255, 255, 0.12)', padding: '8px', borderRadius: '8px', color: '#f59f00', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <BarChart2 size={18} />
-                </div>
-                <div>
-                  <strong style={{ display: 'block', fontSize: '14px', color: '#fff', marginBottom: '2px' }}>Reportes por Métodos de Pago</strong>
-                  <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.75)' }}>Analiza en detalle las ventas por tipo de cobro.</span>
                 </div>
               </div>
 

@@ -236,8 +236,8 @@ export default function Ofertas({ ofertas, kiosco }) {
       alert("Este distribuidor no tiene configurado un número de WhatsApp en la base de datos.");
       return;
     }
-    const storeName = kiosco?.businessConfig?.storeName || kiosco?.businessConfig?.name || 'Kiosco';
-    const message = `Hola ${dist.name}, te contacto desde el comercio "${storeName}" a través de KioscoProX para consultar sobre sus ofertas y catálogo mayorista.`;
+    const storeName = kiosco?.businessConfig?.storeName || kiosco?.businessConfig?.name || 'Comercio';
+    const message = `Hola ${dist.name}, te contacto desde el comercio "${storeName}" a través de Simple ProX para consultar sobre sus ofertas y catálogo mayorista.`;
     const url = buildWhatsAppUrl(dist.whatsappNumber, message, null, null);
     try {
       if (window.api && window.api.openExternal) {

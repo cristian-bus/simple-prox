@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Package, ArrowLeft, Plus, X, Box, DollarSign, Wallet, Eye, Edit2, Save, Trash2, Settings } from 'lucide-react';
+import { Search, Package, ArrowLeft, Plus, X, Box, DollarSign, Wallet, Eye, Edit2, Save, Trash2, Settings, CheckCircle2 } from 'lucide-react';
 
 const Modal = ({ title, onClose, minWidth, children }) => (
   <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26, 31, 54, 0.6)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -90,6 +90,7 @@ const Compras = ({ kiosco }) => {
   const [editingSupplierId, setEditingSupplierId] = useState(null);
   const [editSupplier, setEditSupplier] = useState({ name: '', phone: '', email: '', address: '' });
   const [supplierToDelete, setSupplierToDelete] = useState(null);
+  const [showSupplierSuccessModal, setShowSupplierSuccessModal] = useState(false);
 
   const handleAddSupplier = () => {
     if (newSupplier.name.trim() === '') return;
@@ -98,6 +99,7 @@ const Compras = ({ kiosco }) => {
     setSupplierTerm(newName);
     setNewSupplier({ name: '', phone: '', email: '', address: '' });
     setShowSupplierModal(false);
+    setShowSupplierSuccessModal(true);
   };
 
   const handleUpdateSupplier = (id) => {
@@ -799,6 +801,28 @@ const Compras = ({ kiosco }) => {
         </Modal>
       )}
       {renderSupplierModal()}
+
+      {/* Modal Proveedor Creado con Éxito */}
+      {showSupplierSuccessModal && (
+        <div className="modal-overlay" onClick={() => setShowSupplierSuccessModal(false)} style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '400px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '24px', animation: 'scaleIn 0.2s ease-out' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(52, 168, 83, 0.1)', marginBottom: '16px' }}>
+                <CheckCircle2 size={28} color="#34a853" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px 0', color: '#1a1f36' }}>¡Proveedor Creado!</h3>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: '1.5', margin: 0 }}>
+                Proveedor creado con éxito.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button className="btn btn-primary" style={{ padding: '12px 32px', borderRadius: '8px', fontWeight: 600 }} onClick={() => setShowSupplierSuccessModal(false)}>
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Confirmar Eliminar Proveedor */}
       {supplierToDelete && (

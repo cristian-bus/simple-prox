@@ -2,7 +2,7 @@
  * Versión canónica del sistema Simple ProX.
  * Se sincroniza con package.json.
  */
-export const APP_VERSION = '1.3.8';
+export const APP_VERSION = '1.3.9';
 
 /**
  * Obtiene la versión real de la aplicación desde Electron o el fallback canónico.

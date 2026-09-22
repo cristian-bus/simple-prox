@@ -122,7 +122,7 @@ const Inventario = ({ kiosco, ofertas }) => {
     setEditingId(null);
   };
 
-  const lowStockCount = products.filter(p => p.isActive && !p.isCombo && p.stock <= (p.stockAlert || 5) && p.stock > 0).length;
+  const lowStockCount = products.filter(p => p.isActive && !p.isCombo && Number(p.stock) <= (p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5) && Number(p.stock) > 0).length;
   const outOfStockCount = products.filter(p => p.isActive && !p.isCombo && p.stock === 0).length;
   const totalInvestment = products.filter(p => !p.isCombo).reduce((acc, p) => acc + ((parseFloat(p.cost) || parseFloat(p.priceNet) * 0.7 || 0) * (p.stock || 0)), 0);
   const productsWithStock = products.filter(p => !p.isCombo && (p.stock || 0) > 0).length;
@@ -169,8 +169,8 @@ const Inventario = ({ kiosco, ofertas }) => {
                           (filterStatus === 'Activo' && p.isActive) || 
                           (filterStatus === 'Inactivo' && !p.isActive);
     const matchesStockLevel = stockLevelFilter === 'Todas' || 
-                              (stockLevelFilter === 'low' && p.stock <= (p.stockAlert || 5) && p.stock > 0 && !p.isService) || 
-                              (stockLevelFilter === 'out' && p.stock <= 0 && !p.isService) ||
+                              (stockLevelFilter === 'low' && Number(p.stock) <= (p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5) && Number(p.stock) > 0 && !p.isService) || 
+                              (stockLevelFilter === 'out' && Number(p.stock) <= 0 && !p.isService) ||
                               (stockLevelFilter === 'replenish' && productMatchesMap.has(p.id)) ||
                               (stockLevelFilter === 'expiring' && p.expirationDate && p.stock > 0 && Math.ceil((new Date(p.expirationDate) - today) / (1000 * 60 * 60 * 24)) <= warningDays && !p.isService);
     
@@ -454,7 +454,7 @@ const Inventario = ({ kiosco, ofertas }) => {
             </thead>
             <tbody>
               {paginatedProducts.map(p => (
-                <tr key={p.id} style={{ backgroundColor: p.stock === 0 ? 'rgba(234, 67, 53, 0.06)' : (p.stock <= (p.stockAlert || 5) && p.stock > 0 ? 'rgba(242, 153, 74, 0.06)' : 'inherit') }}>
+                <tr key={p.id} style={{ backgroundColor: Number(p.stock) === 0 ? 'rgba(234, 67, 53, 0.06)' : (Number(p.stock) <= (p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5) && Number(p.stock) > 0 ? 'rgba(242, 153, 74, 0.06)' : 'inherit') }}>
                   <td>
                     <div className="product-cell">
                       <span className="product-name" style={{ fontSize: '13px' }}>{p.name}</span>
@@ -474,7 +474,7 @@ const Inventario = ({ kiosco, ofertas }) => {
                       <div className="toggle-thumb"></div>
                     </div>
                   </td>
-                  <td style={{ fontWeight: 600, color: p.stock <= (p.stockAlert || 5) ? 'var(--color-danger)' : 'inherit', fontSize: '13px' }}>
+                  <td style={{ fontWeight: 600, color: Number(p.stock) <= (p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5) && Number(p.stock) > 0 ? 'var(--color-danger)' : 'inherit', fontSize: '13px' }}>
                     {p.unitType === 'Peso (Kg)' ? `${Number(p.stock).toFixed(3)} Kg` : `${p.stock} u`}
                   </td>
                   <td style={{ textAlign: 'center', padding: '4px' }}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Copy, Percent, Save, Check, Calendar, Send, Bell, RefreshCw, Key, DownloadCloud, Wifi, WifiOff } from 'lucide-react';
-import { generateLicenseKey } from '../hooks/useKiosco';
+import { generateLicenseKey, isValidLicenseKey } from '../hooks/useKiosco';
 import { testTelegramNotification, fetchRemoteMasterKey } from '../services/activationService';
 import { generate5MonthsDemoData } from '../utils/demoDataGenerator';
 import { registerMerchantRemotely } from '../services/adSyncEngine';
@@ -124,12 +124,18 @@ const Configuracion = ({ kiosco }) => {
   };
 
   const handleActivateLicense = () => {
-    const expected = generateLicenseKey(kiosco.businessConfig?.installationId);
-    if (licenseKeyInput.trim().toUpperCase() === expected) {
+    const rawId = kiosco.businessConfig?.installationId;
+    let inputKey = licenseKeyInput.trim().toUpperCase().replace(/\s+/g, '');
+    if (inputKey.length === 8 && !inputKey.includes('-')) {
+      inputKey = `${inputKey.slice(0, 4)}-${inputKey.slice(4, 8)}`;
+    }
+
+    if (isValidLicenseKey(rawId, inputKey)) {
+      const canonical = generateLicenseKey(rawId);
       kiosco.updateBusinessConfig({
         ...kiosco.businessConfig,
         plan: 'Pro',
-        licenseKey: expected
+        licenseKey: inputKey || canonical
       });
 
       // Sincronizar inmediatamente a Supabase para reflejar Plan Pro en el panel admin
@@ -786,8 +792,8 @@ const Configuracion = ({ kiosco }) => {
                   className="input" 
                   placeholder="ID del cliente" 
                   value={generatorInput}
-                  onChange={e => setGeneratorInput(e.target.value.toUpperCase())}
-                  style={{ padding: '6px 12px', fontSize: '13px', width: '120px' }}
+                  onChange={e => setGeneratorInput(e.target.value.trim())}
+                  style={{ padding: '6px 12px', fontSize: '13px', width: '220px' }}
                 />
                 <button 
                   className="btn btn-outline" 

@@ -1,6 +1,112 @@
 # Registro de Decisiones y Cambios
 
-## 2026-09-11 (Filtro por Ciudad en Campañas B2B y Menú de Acciones Fijo con Dropup Inteligente)
+## 2026-09-22 (Versión 1.3.9: Detalle de Deuda Fiado, Filtro Diario en Reportes, Liberación Métodos de Pago y Notación Compacta)
+- **Fase**: FASE 1 / FASE 4 / FASE 12 — Estabilización, Reportes, POS y Distribución
+- **Problema**:
+  1. Los comerciantes necesitaban consultar con exactitud cuándo un cliente retiró productos fiados (fecha, hora, artículos y montos).
+  2. En Reportes y Rendición, se necesitaba filtrar ventas de un día específico sin depender únicamente de rangos globales predefinidos, y disponer de un botón claro e independiente para calcular la ganancia real.
+  3. Se requería liberar el filtro por métodos de pago para el Plan Básico en Reportes y removerlo de las restricciones en Soporte.
+  4. En el panel de administración, cifras elevadas de impresiones y clics desbordaban las tarjetas visuales.
+- **Solución**:
+  1. `src/screens/Clientes.jsx`: Se agregó botón de detalle en clientes deudores que abre un modal con el desglose histórico de cada compra a crédito (fecha, hora, productos, cantidad, precio unitario y total).
+  2. `src/screens/Reportes.jsx`: Se añadió selector de fecha específica (`type="date"`), botón independiente y jerarquizado para "Calcular Rentabilidad / Ganancia Real", y se liberó el filtro por medio de pago (Efectivo, Tarjeta, Transferencia, QR, Fiado) sin restricción de plan.
+  3. `src/screens/Soporte.jsx`: Se removió el beneficio de métodos de pago de la tarjeta de Plan Pro.
+  4. `panel-admin/index.html`: Se implementó notación compacta (`formatCompactMetric`) con sufijos K y M, acompañada de tooltip nativo con valor exacto al pasar el cursor.
+  5. Empaquetado y release oficial v1.3.9 en GitHub Releases para auto-actualización silenciosa.
+- **Archivos modificados**:
+  - `src/screens/Clientes.jsx`
+  - `src/screens/Reportes.jsx`
+  - `src/screens/Soporte.jsx`
+  - `panel-admin/index.html`
+  - `package.json`
+  - `src/constants/version.js`
+  - `checklist/index.html`
+  - `docs/DECISIONS.md`
+- **Resultado**: Release v1.3.9 lista y empaquetada, con canal de actualización en la nube activo.
+
+## 2026-09-21 (Corrección de Jerarquía HTML y Solapamiento de Métricas en Pestañas del Panel B2B)
+- **Fase**: FASE 4 — Panel Administrador B2B
+- **Problema**: 
+  - Al seleccionar las pestañas "Métricas y Clics", "Comercios Activos", "Directorio de Distribuidores" o "Configuración", la tarjeta de contenido se renderizaba solapada por encima de las tarjetas de métricas globales (KPIs: Impresiones Totales, Clics a WhatsApp, Ofertas Abiertas, CTR), tapando y cortando los números a la mitad. En contraste, en "Campañas B2B" se visualizaba correctamente.
+  - Causa raíz:
+    - Existían etiquetas de cierre `</div>` redundantes en la primera fila de filtros de "Campañas B2B" y "Comercios Conectados".
+    - Esto provocaba que `<div class="content-area">` se cerrara prematuramente justo después de la primera pestaña (`view-campaigns`).
+    - Al alternar a cualquiera de las otras vistas (`view-metrics`, `view-merchants`, etc.), estas quedaban renderizadas como elementos huérfanos fuera del contenedor principal con flex layout anómalo, provocando que se encimaran sobre `.kpi-grid`.
+- **Solución**:
+  1. `panel-admin/index.html`:
+     - Se auditaron y balancearon las 5334 líneas del documento HTML.
+     - Se eliminaron los dos cierres `</div>` duplicados en las barras de filtros.
+     - Se verificó que todas las pestañas (`view-campaigns`, `view-metrics`, `view-merchants`, `view-distributors`, `view-settings`) residan dentro de `.content-area` en el flujo normal bajo `.kpi-grid`.
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Script automatizado de auditoría de pila de etiquetas HTML: 0 errores de desbalance, 0 etiquetas huérfanas, 0 cierres prematuros.
+  - Compilación de producción con Vite (`npm run build`, 0 errores).
+- **Resultado**: Estructura DOM 100% balanceada. Las tarjetas de métricas se muestran completas, limpias y con el espaciado correcto sin ningún solapamiento en ninguna pestaña.
+
+## 2026-09-21 (Ventana Modal Centrada con Buscador para Filtros de Listas Largas en Panel B2B)
+- **Fase**: FASE 4 — Panel Administrador B2B
+- **Problema**: 
+  - En los filtros con listas extensas de opciones (provincias, ciudades, categorías, distribuidores, técnicos instaladores) a lo largo de las distintas pestañas del panel de administración (`panel-admin/index.html`), el desplegable nativo del sistema operativo se disparaba hacia arriba tapando elementos del encabezado o desbordando de manera antiestética y difícil de scrollear.
+- **Solución**:
+  1. `panel-admin/index.html`:
+     - Se implementó un sistema universal de modal picker centrado (`#filter-picker-modal`) con diseño moderno acorde a la estética dark/glass del panel, barra de búsqueda en tiempo real, scroll optimizado y soporte para tecla `Escape` o clic fuera del modal.
+     - Se reemplazaron los selects nativos visibles en las pestañas "Campañas B2B", "Comercios Conectados" y "Directorio de Distribuidores" por botones disparadores estilizados (`.filter-modal-btn`), manteniendo los elementos `<select>` originales en el DOM con `display: none`.
+     - De este modo, se preservaron intactos todos los IDs, bindings, eventos `onchange`, listeners y funciones de filtrado originales (`applyCampaignFilters`, `filterMerchants`, `renderDistributors`) sin alterar la lógica de negocio ni dependencias.
+     - Se sincronizó reactivamente el texto y estado activo de los botones mediante `syncPickerButton` y `syncAllPickerButtons` en las cargas dinámicas (`loadCategories`, `refreshDistributorSelects`, `populateDistributorCityOptions`, `populateMerchantCityOptions`, `switchTab`).
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Script de validación de sintaxis y presencia de elementos picker (`verify_panel_admin.js`, 0 errores).
+  - Verificación de los 10 selectores de filtros y sus correspondientes botones vinculados.
+  - Verificación de la preservación total de los IDs y funciones de filtrado.
+- **Resultado**: Interfaz de filtrado ágil, centrada y estética con buscador instantáneo en todas las listas largas, sin regresiones en las tablas ni en el funcionamiento existente.
+
+## 2026-09-11 (Rebranding Completo a Simple ProX e Incorporación de Nuevos Iconos y Logo Oficial)
+- **Fase**: FASE 12 — Identidad de Marca y Empaquetado Desktop
+- **Problema**: 
+  - La aplicación requería completar la transición de nombre e identidad visual de "KioscoProX" a "Simple ProX" en todos los textos visibles de cara al usuario, mensajes de contacto por WhatsApp a distribuidores mayoristas, notificaciones de Telegram y panel de administración.
+  - El instalador ejecutable de Windows (.exe) y el icono de la ventana utilizaban el logo anterior y carecían de un archivo `.ico` multi-resolución con la nueva identidad provista por el usuario (isotipo monograma "S" en cian/azul con fondo oscuro de alta tecnología).
+- **Solución**:
+  1. **Generación de Assets de Marca**:
+     - Se procesó el archivo de imagen oficial subido por el usuario para aislar el nuevo isotipo con fondo transparente y antialiasing óptimo.
+     - Se generó `build/icon.ico` y `public/icon.ico` con soporte nativo de resoluciones Windows: 256x256, 128x128, 64x64, 48x48, 32x32 y 16x16.
+     - Se crearon `build/icon.png` y `public/icon.png` (512x512) para el empaquetado y web.
+     - Se actualizó `public/logo.jpg` para Onboarding y favicon, y se guardó `public/logo_full.png` con la tipografía oficial "Simple ProX - Gestión simple para tu negocio".
+  2. **Configuración de Electron y Empaquetado**:
+     - En `package.json` se configuró `"win": { "icon": "build/icon.ico" }` y los iconos de NSIS (`installerIcon`, `uninstallerIcon`) para que el instalador y el ejecutable instalado lleven el nuevo icono.
+     - En `electron/main.js` se vinculó `icon: path.join(__dirname, '../public/icon.ico')`.
+  3. **Mensajes y Textos Visibles**:
+     - `src/screens/Ofertas.jsx`: Mensaje preformateado de WhatsApp a distribuidores actualizado a "a través de Simple ProX".
+     - `src/services/activationService.js`: Encabezados y pruebas de notificación de Telegram actualizados a "Simple ProX".
+     - `src/components/ActivationGuard.jsx`: Mensaje visible de activación del sistema actualizado a "Simple ProX".
+     - `panel-admin/index.html`: Títulos, encabezados, subtítulo de red de comercios, reportes CSV y plantilla de WhatsApp a mayoristas actualizados a "Simple ProX".
+     - `generador-licencias/licenciaskioscoprox.html`: Título y encabezado visual actualizados a "Simple ProX Admin".
+  4. **Preservación Crítica**:
+     - Se mantuvieron 100% inalteradas las claves de almacenamiento interno en `localStorage` y la sal de licenciamiento (`SECRET_SALT`), protegiendo los datos existentes, ventas, inventario y licencias activadas sin riesgo de regresión.
+- **Archivos modificados**:
+  - `build/icon.ico` (NUEVO)
+  - `build/icon.png` (NUEVO)
+  - `public/icon.ico` (NUEVO)
+  - `public/icon.png` (NUEVO)
+  - `public/logo.jpg` (ACTUALIZADO)
+  - `public/logo_full.png` (NUEVO)
+  - `package.json`
+  - `electron/main.js`
+  - `src/screens/Ofertas.jsx`
+  - `src/components/ActivationGuard.jsx`
+  - `src/services/activationService.js`
+  - `panel-admin/index.html`
+  - `generador-licencias/licenciaskioscoprox.html`
+  - `docs/DECISIONS.md`
+- **Pruebas realizadas**:
+  - Inspección dimensional y visual de los assets generados.
+  - Compilación de producción con Vite (`npm run build`, exit code 0).
+  - Verificación estricta de no-regresión en persistencia de datos y licencias.
+- **Resultado**: Nueva identidad visual Simple ProX integrada en ejecutable, instalador, interfaz y comunicaciones comerciales.
+
 - **Fase**: FASE 4 / FASE 2 — Panel Administrador (UI/UX de Campañas B2B)
 - **Problema**: 
   - En la pestaña "Campañas B2B" no era posible filtrar por ciudad/localidad específica para aislar promociones locales (ej. Río Cuarto vs Córdoba Capital).
@@ -535,4 +641,24 @@
   - `panel-admin/index.html`
   - `docs/DECISIONS.md`
 - **Resultado**: La aplicación se reinicia automáticamente tras actualizarse, y las ofertas en caja rotan dinámicamente cada 7 segundos con control manual total e interactivo.
+
+## 2026-09-21 (Optimización Estética de Filtros de Campañas y Filtrado por Técnico en Comercios B2B)
+- **Fase**: FASE 4 / FASE 5 - Panel Administrador B2B
+- **Problema**:
+  1. En el panel B2B (`panel-admin/index.html`), las etiquetas de estado de campañas colapsaban en una columna vertical de 6 renglones y los 4 desplegables de segmentación se apretaban cortando los textos descriptivos.
+  2. En la sección de "Comercios Activos", no se podía filtrar por el técnico instalador que dio de alta cada comercio.
+- **Solución**:
+  1. En `#view-campaigns`:
+     - Se rediseñó el contenedor de filtros en 2 niveles armoniosos: Fila 1 con buscador amplio y selects de segmentación; Fila 2 con etiqueta descriptiva de estado y píldoras horizontales con amplio espacio.
+     - Se acotó `setCampaignStatusFilter` al ámbito de campañas.
+  2. En `#view-merchants`:
+     - Se agregó el desplegable `#filter-merchant-installer` integrado a una barra de dos filas consistente.
+     - Se creó la función `populateMerchantInstallerOptions` para agrupar y listar dinámicamente los instaladores registrados con el conteo de comercios de cada uno.
+     - Se integró el filtro por técnico en `filterMerchants()`.
+     - Se visibilizó el técnico instalador debajo del nombre del comercio en la tabla con icono de llave inglesa.
+     - Se actualizaron las funciones de guardado y borrado de comercio para refrescar la lista de técnicos y el filtrado.
+- **Archivos modificados**:
+  - `panel-admin/index.html`
+  - `docs/DECISIONS.md`
+- **Resultado**: Interfaz de campañas organizada y limpia sin colapso vertical, y capacidad inmediata para auditar y filtrar comercios instalados por técnico específico.
 

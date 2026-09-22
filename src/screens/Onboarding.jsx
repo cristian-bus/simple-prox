@@ -5,6 +5,7 @@ import { registerMerchantRemotely } from '../services/adSyncEngine';
 import { ARGENTINA_PROVINCES, getCitiesForProvince } from '../utils/argentinaGeo';
 import { getCommerceProfile, saveCommerceProfile } from '../services/installationService';
 import { APP_VERSION } from '../constants/version';
+import logoImg from '../assets/logo.jpg';
 
 const ICONS = {
   kiosco: <Store size={32} />,
@@ -167,7 +168,7 @@ export default function Onboarding({ kiosco }) {
         {/* PASO 1: NOMBRE */}
         {step === 1 && (
           <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
-            <img src="/logo.jpg" alt="Simple ProX Logo" style={{ width: '80px', height: '80px', borderRadius: '16px', marginBottom: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} />
+            <img src={logoImg} alt="Simple ProX Logo" style={{ width: '80px', height: '80px', borderRadius: '16px', marginBottom: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', objectFit: 'cover' }} />
             <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#1a1f36', marginBottom: '16px' }}>
               ¡Bienvenido a Simple ProX! 👋
             </h1>

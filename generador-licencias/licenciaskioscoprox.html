@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Generador de Licencias - KioscoProX</title>
+  <title>Generador de Licencias - Simple ProX</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -169,7 +169,7 @@
 <body>
 
   <div class="container">
-    <div class="logo">KioscoProX Admin</div>
+    <div class="logo">Simple ProX Admin</div>
     <div class="subtitle">Generador de Licencias PRO</div>
 
     <div class="input-group">
@@ -194,8 +194,9 @@
 
     function generateLicenseKey(installationId) {
       if (!installationId) return '';
+      const cleanId = String(installationId).replace(/^id:\s*/i, '').trim();
       let hash = 0;
-      const str = installationId + SECRET_SALT;
+      const str = cleanId + SECRET_SALT;
       for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
@@ -206,13 +207,14 @@
     }
 
     function generate() {
-      const input = document.getElementById('installationId').value.trim();
-      if (!input) {
+      const rawInput = document.getElementById('installationId').value.trim();
+      if (!rawInput) {
         alert('Por favor, ingresa un ID de instalación válido.');
         return;
       }
       
-      const key = generateLicenseKey(input);
+      const cleanId = rawInput.replace(/^id:\s*/i, '').trim();
+      const key = generateLicenseKey(cleanId);
       document.getElementById('keyDisplay').textContent = key;
       document.getElementById('resultContainer').style.display = 'block';
       

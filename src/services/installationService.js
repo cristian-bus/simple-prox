@@ -20,8 +20,9 @@ const CURRENT_APP_VERSION = APP_VERSION;
  */
 export function calculateLicenseKey(installationId) {
   if (!installationId) return '';
+  const cleanId = String(installationId).replace(/^id:\s*/i, '').trim();
   let hash = 0;
-  const str = String(installationId) + SECRET_SALT;
+  const str = cleanId + SECRET_SALT;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
@@ -29,6 +30,29 @@ export function calculateLicenseKey(installationId) {
   }
   const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
   return `${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+}
+
+/**
+ * Valida de forma tolerante y retrocompatible si una clave de licencia corresponde al equipo
+ */
+export function isValidLicenseKey(installationId, licenseKey) {
+  if (!installationId || !licenseKey) return false;
+  const rawId = String(installationId).trim();
+  const cleanId = rawId.replace(/^id:\s*/i, '').trim();
+  
+  const validKeys = [
+    calculateLicenseKey(rawId),
+    calculateLicenseKey(cleanId),
+    calculateLicenseKey(cleanId.toLowerCase()),
+    calculateLicenseKey(cleanId.toUpperCase())
+  ].filter(Boolean);
+
+  let entered = String(licenseKey).trim().toUpperCase().replace(/\s+/g, '');
+  if (entered.length === 8 && !entered.includes('-')) {
+    entered = `${entered.slice(0, 4)}-${entered.slice(4, 8)}`;
+  }
+
+  return validKeys.some(k => k.toUpperCase() === entered);
 }
 
 /**

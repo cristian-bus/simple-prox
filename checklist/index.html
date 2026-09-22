@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checklist de Control de Calidad (QA) - Simple ProX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-body: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1c2640;
+      --bg-card-hover: #222f4f;
+      --border: #2a3859;
+      --border-focus: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.15);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.15);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.15);
+      --info: #06b6d4;
+      --info-bg: rgba(6, 182, 212, 0.15);
+      --purple: #8b5cf6;
+      --purple-bg: rgba(139, 92, 246, 0.15);
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+
+    /* Top Sticky Header */
+    header.top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+
+    .top-bar-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .version-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Metrics & Counters */
+    .metrics-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .metric-pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .metric-pill .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .metric-pill.success .dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .metric-pill.danger .dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    .metric-pill.warning .dot { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+    .metric-pill.total .dot { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+
+    .metric-val {
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .progress-container {
+      width: 160px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .progress-bar-bg {
+      height: 8px;
+      width: 100%;
+      background: #1e293b;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      transition: width 0.4s ease;
+      border-radius: 4px;
+    }
+
+    .progress-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      font-weight: 600;
+    }
+
+    /* Actions Header */
+    .actions-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-outline { background: transparent; border-color: var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--bg-card); border-color: var(--text-muted); }
+    .btn-danger-outline { background: transparent; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+    .btn-danger-outline:hover { background: var(--danger-bg); border-color: var(--danger); }
+
+    /* Main Container */
+    .container {
+      max-width: 1400px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    /* Filter Panel */
+    .filter-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .search-input-box {
+      position: relative;
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .search-input-box input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px 10px 38px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input-box input:focus {
+      border-color: var(--primary);
+    }
+
+    .search-input-box svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+    }
+
+    .filter-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      border-color: var(--primary);
+      color: var(--text-main);
+    }
+
+    .chip.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* Section Box */
+    .section-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      margin-bottom: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: border-color 0.2s;
+    }
+
+    .section-box.completed {
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .section-header {
+      padding: 18px 24px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .section-header:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .section-icon-badge {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+
+    .section-title h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .section-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .section-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .toggle-arrow {
+      transition: transform 0.3s ease;
+      color: var(--text-dim);
+    }
+
+    .section-box.collapsed .toggle-arrow {
+      transform: rotate(-90deg);
+    }
+
+    .section-box.collapsed .section-content {
+      display: none;
+    }
+
+    .section-content {
+      padding: 16px 24px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Item Card */
+    .check-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 18px;
+      align-items: start;
+      transition: all 0.2s ease;
+    }
+
+    .check-item:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .check-item.status-ok {
+      border-left: 5px solid var(--success);
+      background: rgba(16, 185, 129, 0.04);
+    }
+
+    .check-item.status-fail {
+      border-left: 5px solid var(--danger);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .check-item.status-pending {
+      border-left: 5px solid var(--warning);
+    }
+
+    /* Buttons OK/Fail */
+    .status-switch {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .status-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      color: var(--text-dim);
+      font-weight: 700;
+    }
+
+    .status-btn.btn-ok:hover, .status-btn.btn-ok.active {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .status-btn.btn-fail:hover, .status-btn.btn-fail.active {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: white;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Item Details */
+    .item-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .item-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .item-code {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--info);
+      background: var(--info-bg);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .item-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .severity-badge {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sev-critical { background: var(--danger-bg); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .sev-high { background: var(--warning-bg); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .sev-medium { background: var(--info-bg); color: #38bdf8; border: 1px solid rgba(6, 182, 212, 0.3); }
+
+    .tag-connection {
+      font-size: 11px;
+      font-weight: 600;
+      color: #c084fc;
+      background: var(--purple-bg);
+      border: 1px solid rgba(192, 132, 252, 0.3);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .item-description {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .item-steps {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .item-steps ol, .item-steps ul {
+      margin-left: 20px;
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+
+    .item-expected {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #4ade80;
+      font-weight: 500;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .item-notes-box {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .item-notes-input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 10px;
+      font-size: 12px;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .item-notes-input:focus {
+      border-color: var(--primary);
+    }
+
+    .quick-status-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .qs-ok { background: var(--success-bg); color: var(--success); }
+    .qs-fail { background: var(--danger-bg); color: var(--danger); }
+    .qs-pending { background: var(--warning-bg); color: var(--warning); }
+
+    .floating-tools {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99;
+      display: flex;
+      gap: 10px;
+      background: rgba(19, 27, 46, 0.95);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+    }
+
+    @media print {
+      body { background: white !important; color: black !important; }
+      header.top-bar, .filter-panel, .actions-box, .floating-tools, .item-notes-input, .status-switch { display: none !important; }
+      .section-box { border: 1px solid #ccc !important; background: white !important; color: black !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 20px !important; }
+      .section-header { background: #f8fafc !important; color: black !important; border-bottom: 1px solid #ddd !important; }
+      .check-item { background: white !important; border: 1px solid #eee !important; color: black !important; grid-template-columns: 1fr auto !important; }
+      .item-title, .section-title h2 { color: black !important; }
+      .item-description, .item-steps { color: #333 !important; background: #fdfdfd !important; }
+      .quick-status-tag { border: 1px solid #999; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Sticky Navigation Bar -->
+  <header class="top-bar">
+    <div class="top-bar-inner">
+      <div class="brand-box">
+        <div class="brand-logo">SPX</div>
+        <div class="brand-text">
+          <h1>Checklist Real de Control de Calidad <span class="version-tag">Simple ProX v1.3.9</span></h1>
+          <p>Auditoría Fiel al Código Fuente • POS, B2B, Inventario, Caja, Panel Admin y Offline</p>
+        </div>
+      </div>
+
+      <!-- Live Counters -->
+      <div class="metrics-row">
+        <div class="metric-pill total" title="Total de Pruebas">
+          <span class="dot"></span>
+          <span>Total:</span>
+          <span class="metric-val" id="count-total">0</span>
+        </div>
+        <div class="metric-pill success" title="Funciones Verificadas Correctas">
+          <span class="dot"></span>
+          <span>Aprobadas:</span>
+          <span class="metric-val" id="count-ok">0</span>
+        </div>
+        <div class="metric-pill danger" title="Fallas Encontradas">
+          <span class="dot"></span>
+          <span>Fallas:</span>
+          <span class="metric-val" id="count-fail">0</span>
+        </div>
+        <div class="metric-pill warning" title="Pruebas Pendientes">
+          <span class="dot"></span>
+          <span>Pendientes:</span>
+          <span class="metric-val" id="count-pending">0</span>
+        </div>
+
+        <div class="progress-container">
+          <div class="progress-text">
+            <span>Progreso</span>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions-box">
+        <button class="btn btn-outline" onclick="exportReportJSON()" title="Descargar estado en JSON para respaldar">
+          💾 Exportar JSON
+        </button>
+        <button class="btn btn-outline" onclick="importReportJSON()" title="Restaurar estado desde JSON previo">
+          📂 Cargar JSON
+        </button>
+        <input type="file" id="import-file-input" style="display:none;" accept=".json" onchange="handleFileSelected(event)">
+        <button class="btn btn-primary" onclick="window.print()" title="Generar versión imprimible o PDF">
+          🖨️ Imprimir / PDF
+        </button>
+        <button class="btn btn-danger-outline" onclick="resetAllChecklist()" title="Reiniciar todas las pruebas">
+          🔄 Reiniciar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Filters & Search -->
+    <div class="filter-panel">
+      <div class="search-input-box">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <input type="text" id="search-input" placeholder="Buscar función, atajo exacto (F2, F3, F4, F6, F7, F8, F12, Doble Enter)..." oninput="applyFilters()">
+      </div>
+
+      <div class="filter-chips">
+        <span class="chip active" data-filter="all" onclick="setFilter('all')">Todos (<span id="chip-all-count">0</span>)</span>
+        <span class="chip" data-filter="pending" onclick="setFilter('pending')">Pendientes (<span id="chip-pending-count">0</span>)</span>
+        <span class="chip" data-filter="fail" onclick="setFilter('fail')">Con Fallas (<span id="chip-fail-count">0</span>)</span>
+        <span class="chip" data-filter="ok" onclick="setFilter('ok')">Aprobados (<span id="chip-ok-count">0</span>)</span>
+        <span class="chip" data-filter="critical" onclick="setFilter('critical')">🚨 Críticos</span>
+      </div>
+    </div>
+
+    <!-- Sections wrapper -->
+    <div id="sections-wrapper"></div>
+
+  </main>
+
+  <div class="floating-tools">
+    <button class="btn btn-outline" onclick="expandAllSections()">📂 Expandir Todo</button>
+    <button class="btn btn-outline" onclick="collapseAllSections()">📁 Colapsar Todo</button>
+    <button class="btn btn-primary" onclick="scrollToNextPending()">⏭️ Siguiente Pendiente</button>
+  </div>
+
+  <script>
+    /**
+     * BASE DE DATOS DE PRUEBAS 100% FIEL AL CÓDIGO FUENTE REAL DE SIMPLE PROX
+     * Refleja exactamente los atajos F reales, controles reales del carrito,
+     * modales existentes y reglas implementadas.
+     */
+    const CHECKLIST_DATA = [
+      {
+        id: "sec-pos",
+        title: "1. Punto de Venta (Ventas)",
+        icon: "🛒",
+        description: "Búsqueda por código/nombre, atajos F reales, manipulación del carrito con +/- y tacho, medios de pago y cobro.",
+        items: [
+          {
+            id: "POS-01",
+            title: "Búsqueda en Tiempo Real y Lector de Código de Barras",
+            severity: "critical",
+            connectedTo: "Productos -> POS",
+            description: "Buscar productos mediante escritura o pistola lectora de código de barras.",
+            steps: [
+              "Hacer clic en el buscador superior del POS o presionar la tecla F2.",
+              "Escanear un producto con lector óptico: al detectar coincidencia exacta de código (código de barras o SKU), el producto debe entrar inmediatamente al carrito y el buscador debe quedar limpio.",
+              "Escribir manualmente texto: debe desplegarse el menú flotante con productos coincidentes, mostrando nombre, stock y precio.",
+              "Hacer clic sobre un producto sugerido o presionar Enter: debe añadirse al carrito."
+            ],
+            expected: "El producto se agrega al carrito sin demoras y el buscador se limpia automáticamente para el siguiente escaneo."
+          },
+          {
+            id: "POS-02",
+            title: "Atajos de Teclado Operativos REALES (F2, F3, F4, F6, F7, F8, F9, F12, Doble Enter, ESC)",
+            severity: "critical",
+            connectedTo: "PuntoDeVenta.jsx (handleKeyDown)",
+            description: "Comprobar los atajos de teclado exactamente como están implementados en el código de Simple ProX.",
+            steps: [
+              "Presionar F2: debe enfocar el buscador principal de productos (#pos-search-input) y cerrar cualquier modal abierto.",
+              "Presionar F3: debe abrir / cerrar el modal de selección y búsqueda de Cliente.",
+              "Presionar F4: debe abrir / cerrar el modal de 'Ítem Extra rápido' para cobrar productos no registrados.",
+              "Presionar F6 (Solo Plan Pro): debe abrir / cerrar el modal de Descuentos y Recargos porcentuales o fijos.",
+              "Presionar F7: debe abrir / cerrar el modal de 'Consultar Precio'.",
+              "Presionar F8 (Solo Plan Pro): debe abrir / cerrar el modal de 'Alertas de Stock y Vencimiento'.",
+              "Presionar F9: con productos en el carrito, debe abrir la vista previa del carrito.",
+              "Presionar F12: debe activar / ocultar el recuadro 'MODO COBRO ACTIVO' de selección de métodos de pago.",
+              "Con F12 activo, presionar Flecha Izquierda ⬅️ o Derecha ➡️: debe alternar entre Efectivo, Tarjeta, Transferencia, QR (y Fiado si es Plan Pro).",
+              "Presionar Doble Enter rápido (< 400ms): debe iniciar el proceso de cobro directo.",
+              "Presionar ESC: debe cerrar cualquier modal que esté en pantalla."
+            ],
+            expected: "Cada tecla de función ejecuta su acción correspondiente sin conflictos ni interferencias con el sistema operativo."
+          },
+          {
+            id: "POS-03",
+            title: "Manipulación de Items en Carrito (+ / - / Editar / Borrar individual)",
+            severity: "critical",
+            connectedTo: "PuntoDeVenta.jsx (updateQty, removeItem, editCartItem)",
+            description: "Verificar las acciones reales disponibles para los productos cargados en el carrito.",
+            steps: [
+              "Sumar cantidad con el botón circular '+': el contador debe subir de a 1 (o fracciones en pesables) y recalcular el subtotal.",
+              "Restar cantidad con el botón circular '-': la cantidad disminuye, pero se detiene en 1 (no borra el producto con el botón '-').",
+              "Hacer clic en el icono del tacho de basura rojo (Trash2) al costado del producto: el producto se elimina individualmente del carrito.",
+              "En productos de unidad pesable (Kg, Gramos, Litros) o ítems extra, presionar el botón de lápiz (Pencil): debe abrir el modal para editar peso o precio.",
+              "Comprobar que NO existe botón de 'vaciar carrito' manual: el carrito solo se vacía al completarse exitosamente una venta."
+            ],
+            expected: "Modificación de cantidades fluida, borrado individual con el tacho y recálculo matemático instantáneo."
+          },
+          {
+            id: "POS-04",
+            title: "Venta de Combos y Kits (Descuento de Stock en Componentes)",
+            severity: "critical",
+            connectedTo: "POS -> Productos -> Inventario",
+            description: "Comprobar que al vender 1 combo se descuente el stock de cada producto componente.",
+            steps: [
+              "Identificar un combo existente (ej: 'Promo Fernet + Coca-Cola').",
+              "Revisar en Inventario el stock previo de cada componente individual.",
+              "En el POS, agregar el combo al carrito y completar la venta.",
+              "Volver a Inventario: el stock de cada producto componente debe haber disminuido en la cantidad configurada en el combo."
+            ],
+            expected: "El combo se cobra al precio pactado y descuenta automáticamente los insumos/productos reales del inventario."
+          },
+          {
+            id: "POS-05",
+            title: "Venta de Ítems Extra Rápidos (Atajo F4)",
+            severity: "high",
+            connectedTo: "PuntoDeVenta.jsx (addCustomItem)",
+            description: "Cobrar un artículo o servicio no registrado en la base de datos sin salir del mostrador.",
+            steps: [
+              "Presionar F4 en el teclado.",
+              "Ingresar nombre (opcional, por defecto 'Ítem Extra') e ingresar el precio a cobrar.",
+              "Presionar Guardar / Enter: debe agregarse al carrito con el badge de ítem rápido.",
+              "Proceder al cobro: debe sumar al total facturado sin alterar inventario de productos físicos."
+            ],
+            expected: "Permite cobrar excepciones o artículos imprevistos al instante sin trabar la fila de clientes."
+          },
+          {
+            id: "POS-06",
+            title: "Cobro en Efectivo con Cálculo de Vuelto",
+            severity: "critical",
+            connectedTo: "POS -> Caja",
+            description: "Cobrar una venta en efectivo ingresando el dinero entregado por el cliente.",
+            steps: [
+              "Con items en el carrito (ej: total $3.500), hacer doble clic en el botón 'Efectivo' o presionar Doble Enter.",
+              "Se abre el modal de cobro en efectivo.",
+              "Ingresar monto recibido: $5.000.",
+              "Verificar que el sistema calcule exactamente 'Vuelto: $1.500'.",
+              "Confirmar venta (Enter): se despliega la pantalla de éxito con el vuelto en grande.",
+              "Verificar que en el recuadro superior 'Mi Caja' el efectivo haya aumentado exactamente en $3.500."
+            ],
+            expected: "Vuelto exacto, pantalla de confirmación clara y dinero sumado a la caja física abierta."
+          },
+          {
+            id: "POS-07",
+            title: "Cobro con Medios Digitales (Tarjeta, Transferencia, QR)",
+            severity: "critical",
+            connectedTo: "POS -> Reportes",
+            description: "Cobrar con medios bancarios o digitales sin alterar los billetes en caja.",
+            steps: [
+              "Seleccionar 'Tarjeta', 'Transferencia' o 'QR' (haciendo clic o usando F12 + flechas).",
+              "Hacer doble clic sobre el botón del medio de pago o presionar Enter: abre el modal de confirmación.",
+              "Confirmar cobro.",
+              "Verificar en 'Mi Caja': el total en billetes físicos NO debe alterarse, pero la venta queda registrada bajo ese canal."
+            ],
+            expected: "El arqueo de billetes permanece intacto y la recaudación digital se clasifica correctamente."
+          },
+          {
+            id: "POS-08",
+            title: "Venta al Fiado (Exclusiva Plan Pro, Exige Cliente)",
+            severity: "critical",
+            connectedTo: "POS -> Clientes -> Cuentas Corrientes",
+            description: "Comprobar las restricciones y el impacto de la venta a crédito.",
+            steps: [
+              "Intentar seleccionar 'Fiado' sin tener cliente seleccionado (estando como 'Consumidor Final'): debe saltar alerta '¡Para FIAR debes seleccionar un Cliente registrado!'.",
+              "Presionar F3 o hacer clic en Cliente, seleccionar un cliente registrado (ej: Juan Pérez).",
+              "Seleccionar 'Fiado' y confirmar venta.",
+              "Ir a la pestaña Clientes: verificar que la deuda de Juan Pérez haya aumentado en el importe exacto de la venta.",
+              "Verificar que en 'Mi Caja' NO se sume efectivo."
+            ],
+            expected: "Seguridad estricta: no permite fiar a consumidor anónimo y asienta la deuda en la ficha del cliente."
+          },
+          {
+            id: "POS-09",
+            title: "Protección por Caja Cerrada",
+            severity: "critical",
+            connectedTo: "POS -> Caja",
+            description: "Verificar el comportamiento cuando la caja no está abierta.",
+            steps: [
+              "Teniendo la caja cerrada, observar el recuadro superior 'Mi Caja (Cerrada)' en rojo con el botón 'Abrir Caja'.",
+              "Intentar cobrar una venta.",
+              "El sistema debe impedir el cobro y requerir abrir caja con un usuario y fondo inicial."
+            ],
+            expected: "Bloqueo de cobros para evitar ventas sin cajero responsable asignado."
+          },
+          {
+            id: "POS-10",
+            title: "Sugerencia Inteligente de Reposición B2B en POS (Banner Flotante)",
+            severity: "high",
+            connectedTo: "POS -> Ofertas B2B -> stockOfferMatcher",
+            description: "Comprobar el banner de sugerencia cuando un producto con oferta B2B tiene stock bajo.",
+            steps: [
+              "Tener un producto con stock ≤ su stock mínimo de alerta que coincida con una campaña B2B activa.",
+              "Cargar el producto en el carrito del POS.",
+              "Comprobar que en la parte superior del carrito aparezca la barra '💡 Sugerencia de Reposición: Quedan Xu de [Producto] · Oferta: [Campaña] con [Mayorista]'.",
+              "Probar el botón 'Ver Oferta' (abre el modal de la oferta).",
+              "Probar 'Pedir WhatsApp' (abre el enlace prearmado).",
+              "Probar 'X' para descartar la sugerencia."
+            ],
+            expected: "Asistencia visual oportuna para reponer mercadería con mayoristas en 1 clic."
+          },
+          {
+            id: "POS-11",
+            title: "Consultor de Precios en Pantalla (Atajo F7 o Botón Precio)",
+            severity: "medium",
+            connectedTo: "PuntoDeVenta.jsx (modal priceCheck)",
+            description: "Consultar rápidamente el precio de un artículo cuando un cliente pregunta en el mostrador.",
+            steps: [
+              "Presionar F7 en el teclado o hacer clic en el botón 'Precio' al lado del buscador.",
+              "Se abre el modal 'Consultar Precio'.",
+              "Escanear un producto o escribir su nombre: debe mostrar en grande su precio de venta, categoría y stock disponible.",
+              "Presionar ESC: debe cerrarse el modal volviendo al carrito intacto."
+            ],
+            expected: "Consulta instantánea sin necesidad de agregar el producto al carrito de la venta en curso."
+          },
+          {
+            id: "POS-12",
+            title: "Gestión de Caja en POS (Ingresos, Retiros y Bloqueo con PIN)",
+            severity: "critical",
+            connectedTo: "PuntoDeVenta.jsx (manageCaja, cajaOperation)",
+            description: "Operar movimientos de dinero físico desde el widget 'Mi Caja'.",
+            steps: [
+              "En el widget 'Mi Caja', hacer clic en el botón de candado: la pantalla debe bloquearse requiriendo el PIN del usuario para continuar.",
+              "Hacer clic en el botón de controles (engranaje/deslizadores) al lado de Mi Caja.",
+              "Probar 'Ingresar Dinero': ingresar $2.000 con motivo 'Cambio traído' -> el efectivo de la caja debe aumentar.",
+              "Probar 'Retirar Dinero': ingresar $1.000 con motivo 'Pago de flete' -> el efectivo de la caja debe disminuir.",
+              "Probar 'Cerrar Turno y Caja': ingresar el arqueo de billetes contado -> calcula diferencia de faltante o sobrante y muestra el resumen del turno."
+            ],
+            expected: "Control exhaustivo del flujo de billetes de la gaveta durante la jornada."
+          }
+        ]
+      },
+      {
+        id: "sec-b2b",
+        title: "2. Ofertas B2B, Mayoristas & Pedidos WhatsApp",
+        icon: "🏷️",
+        description: "Catálogo mayorista, rotación de anuncios, carrito B2B con compra mínima, WhatsApp y funcionamiento offline.",
+        items: [
+          {
+            id: "B2B-01",
+            title: "Pestaña 'Promociones' vs 'Mayoristas y Catálogos'",
+            severity: "high",
+            connectedTo: "Ofertas.jsx",
+            description: "Comprobar el selector dual de la pantalla de Ofertas B2B.",
+            steps: [
+              "Ir a 'Ofertas B2B' en la barra inferior (visible cuando el rubro del negocio es 'kiosco').",
+              "Alternar entre 'Promociones' (anuncios y combos de productos) y 'Mayoristas y Catálogos' (directorio de distribuidores).",
+              "Verificar que cada pestaña cargue su información sin parpadeos."
+            ],
+            expected: "Navegación limpia entre ofertas directas y listado de distribuidores oficiales."
+          },
+          {
+            id: "B2B-02",
+            title: "Carrusel Rotativo de Anuncios (Rotación 7s, Pausa en Hover)",
+            severity: "high",
+            connectedTo: "OfertasBannerWidget.jsx -> useOfertas",
+            description: "Comprobar el banner publicitario inferior en POS y en la pantalla de ofertas.",
+            steps: [
+              "Observar la rotación automática de los banners: debe cambiar cada 7 segundos.",
+              "Colocar el cursor del mouse sobre el banner (Hover): la rotación DEBE pausarse.",
+              "Quitar el cursor: la rotación debe reanudarse.",
+              "Usar los botones '<' y '>' para navegar manualmente entre las ofertas activas."
+            ],
+            expected: "Rotación suave, pausa en hover y navegación manual perfecta."
+          },
+          {
+            id: "B2B-03",
+            title: "Modal Detalle de Oferta (`OfertaDetailModal`)",
+            severity: "critical",
+            connectedTo: "OfertaDetailModal.jsx",
+            description: "Verificar la ficha detallada de una oferta mayorista.",
+            steps: [
+              "Hacer clic en cualquier banner o tarjeta de oferta.",
+              "Verificar que se muestre: Imagen, Título, Mayorista/Distribuidor, Precio oferta, Precio regular tachado, % de Ahorro, Compra Mínima y Fechas de vigencia.",
+              "Comprobar que se registre el evento de métrica 'offer_open' sin duplicarse por doble clic rápido."
+            ],
+            expected: "Ficha comercial nítida y registro de evento en la cola de métricas."
+          },
+          {
+            id: "B2B-04",
+            title: "Contacto Directo por WhatsApp 1 a 1",
+            severity: "critical",
+            connectedTo: "Electron openExternal -> WhatsApp",
+            description: "Verificar el botón 'Consultar por WhatsApp' en la oferta.",
+            steps: [
+              "En la oferta, hacer clic en 'Consultar por WhatsApp'.",
+              "Debe abrirse en el navegador web el enlace a https://wa.me/ con el número del mayorista.",
+              "Verificar que el mensaje predeterminado contenga: Nombre del comercio, Código de campaña y Nombre del producto.",
+              "Comprobar que se registre el evento 'whatsapp_click'."
+            ],
+            expected: "Apertura en el navegador del sistema con mensaje listo para enviar."
+          },
+          {
+            id: "B2B-05",
+            title: "Carrito B2B Mayorista Multiproducto (`B2BCartModal`)",
+            severity: "critical",
+            connectedTo: "B2BCartModal.jsx -> LocalStorage (b2bCart)",
+            description: "Armar pedidos con múltiples productos de uno o más mayoristas.",
+            steps: [
+              "En las tarjetas de ofertas, presionar el botón '+ Agregar Pedido' y elegir cantidades.",
+              "Verificar que el botón flotante del carrito B2B muestre la cantidad de artículos acumulados.",
+              "Cerrar la app o recargar: comprobar que los items en el carrito B2B persistan en localStorage (clave 'b2bCart')."
+            ],
+            expected: "El carrito B2B es independiente del carrito de ventas al público y persiste en la terminal."
+          },
+          {
+            id: "B2B-06",
+            title: "Control Visual de Compra Mínima por Mayorista",
+            severity: "high",
+            connectedTo: "B2BCartModal.jsx",
+            description: "Comprobar la barra de progreso de compra mínima.",
+            steps: [
+              "Abrir el modal del Carrito B2B.",
+              "Si el subtotal del pedido no alcanza la compra mínima del mayorista (ej: mínimo $50.000 y el pedido suma $30.000):",
+              "Verificar que la barra indique el porcentaje alcanzado y muestre la advertencia de monto faltante."
+            ],
+            expected: "Informa claramente al comerciante cuánto le falta comprar para que el mayorista despache el pedido."
+          },
+          {
+            id: "B2B-07",
+            title: "Generación de Mensaje Consolidado para WhatsApp (`b2bOrderFormatter`)",
+            severity: "critical",
+            connectedTo: "b2bOrderFormatter.js",
+            description: "Verificar el texto estructurado del pedido que se envía al distribuidor.",
+            steps: [
+              "En el Carrito B2B, presionar 'Enviar Pedido por WhatsApp'.",
+              "Revisar el mensaje generado:",
+              "- Encabezado con datos de la tienda (Nombre, Dirección, Teléfono).",
+              "- Lista de productos con cantidades y subtotales.",
+              "- Total del pedido en negrita.",
+              "- Solicitud de confirmación de stock y entrega."
+            ],
+            expected: "Mensaje comercial impecable y profesional listo para enviar por WhatsApp."
+          },
+          {
+            id: "B2B-08",
+            title: "Chip de Filtrado Rápido '🚨 Reposición Stock'",
+            severity: "medium",
+            connectedTo: "Ofertas.jsx -> stockOfferMatcher",
+            description: "Filtrar únicamente las ofertas que sirvan para reponer productos con bajo stock en la tienda.",
+            steps: [
+              "En la pantalla de Ofertas B2B, hacer clic en el chip '🚨 Reposición Stock'.",
+              "Verificar que solo se listen aquellas campañas cuyos productos tengan stock actual ≤ stock mínimo en el local."
+            ],
+            expected: "Filtro instantáneo que ahorra tiempo al comerciante para abastecerse de lo que le falta."
+          },
+          {
+            id: "B2B-09",
+            title: "Matching Geográfico de Campañas (Provincia / Localidad)",
+            severity: "critical",
+            connectedTo: "b2bUtils.js -> useOfertas",
+            description: "Verificar que solo se muestren campañas disponibles para la provincia/ciudad del comercio.",
+            steps: [
+              "Con el comercio configurado en 'San Luis' (AR-D), verificar que aparezcan campañas para San Luis o de alcance nacional.",
+              "Comprobar que NO aparezcan promociones exclusivas de otras provincias donde el mayorista no reparte."
+            ],
+            expected: "Segmentación geográfica estricta para evitar ofertas no entregables en la zona."
+          },
+          {
+            id: "B2B-10",
+            title: "Regla de Licenciamiento en B2B (Básico Obligatorio vs Pro con Toggle)",
+            severity: "critical",
+            connectedTo: "useOfertas.js -> Configuracion.jsx",
+            description: "Verificar el comportamiento de los banners según el plan del comercio.",
+            steps: [
+              "Con Plan Básico: Los banners deben mostrarse obligatoriamente; en Configuración no debe haber opción de ocultarlos.",
+              "Con Plan Pro: En Configuración aparece el toggle 'Ocultar Publicidad / Banners B2B'.",
+              "Activar el toggle: El banner en el POS debe desaparecer.",
+              "Desactivar el toggle: El banner debe volver a mostrarse."
+            ],
+            expected: "Monetización asegurada en Plan Básico y beneficio premium desbloqueable para usuarios Pro."
+          },
+          {
+            id: "B2B-11",
+            title: "Modo Offline y Caché Local de Ofertas (`adSyncEngine`)",
+            severity: "critical",
+            connectedTo: "adSyncEngine.js -> LocalStorage",
+            description: "Comprobar el funcionamiento del módulo B2B cuando no hay internet.",
+            steps: [
+              "Desconectar el WiFi o cable de red.",
+              "Navegar por el POS y la pantalla de Ofertas B2B.",
+              "Las ofertas previamente descargadas deben seguir visibles desde la caché local sin pantallas en blanco ni errores de conexión."
+            ],
+            expected: "Experiencia 100% offline-first sin interrupciones."
+          },
+          {
+            id: "B2B-12",
+            title: "Cola Outbox de Métricas Offline e Idempotencia",
+            severity: "critical",
+            connectedTo: "adSyncEngine.js -> Supabase",
+            description: "Verificar que las impresiones y clics generados sin internet se sincronicen al reconectar.",
+            steps: [
+              "Estando sin internet, abrir 2 ofertas y hacer clic en WhatsApp.",
+              "Verificar que los eventos se almacenen en localStorage ('kioscoprox_ad_events_queue') con UUIDs únicos.",
+              "Reconectar internet: la función flushPendingEvents debe enviar los eventos a Supabase y vaciar la cola local sin duplicados."
+            ],
+            expected: "Integridad de las métricas comerciales sin pérdida ni duplicación de eventos."
+          }
+        ]
+      },
+      {
+        id: "sec-products",
+        title: "3. Catálogo de Productos",
+        icon: "📦",
+        description: "Alta, edición cruzada, borrado individual y masivo, combos (Pro), insumos de servicios, categorías con emojis y Excel.",
+        items: [
+          {
+            id: "PROD-01",
+            title: "Alta de Producto con Cálculo Automático de Margen e IVA",
+            severity: "critical",
+            connectedTo: "Productos.jsx -> useKiosco",
+            description: "Crear un producto nuevo completando datos comerciales.",
+            steps: [
+              "Hacer clic en '+ Nuevo' -> 'Producto Simple'.",
+              "Ingresar: Nombre, Código de Barras / SKU, Categoría, Costo ($1.000) y % Ganancia (50%).",
+              "Verificar que el Precio Venta se calcule automáticamente en $1.500.",
+              "Ingresar Stock Inicial (20) y Stock Mínimo de alerta (5).",
+              "Guardar: debe aparecer de inmediato en la tabla de productos."
+            ],
+            expected: "Cálculo matemático instantáneo y persistencia inmediata en el catálogo."
+          },
+          {
+            id: "PROD-02",
+            title: "Edición Cruzada de Precios",
+            severity: "high",
+            connectedTo: "Productos -> POS -> Inventario",
+            description: "Modificar el precio de un producto y verificar que impacte en todas las pantallas.",
+            steps: [
+              "Editar un producto existente y cambiarle el precio de venta.",
+              "Guardar.",
+              "Ir a 'Ventas' (POS) y buscar ese producto: debe figurar con el nuevo precio.",
+              "Ir a 'Inventario': debe figurar con el nuevo precio."
+            ],
+            expected: "Sincronización en tiempo real sin requerir reiniciar la aplicación."
+          },
+          {
+            id: "PROD-03",
+            title: "Eliminación Individual y Borrado Masivo (`handleBulkDelete`)",
+            severity: "high",
+            connectedTo: "Productos.jsx",
+            description: "Comprobar el borrado individual y el botón 'Borrar' para selección múltiple.",
+            steps: [
+              "En la tabla, hacer clic en el botón de tacho de un producto: debe pedir confirmación antes de eliminar.",
+              "Marcar las casillas de verificación (checkbox) de varios productos.",
+              "Hacer clic en el botón rojo 'Borrar' de la barra superior de acciones.",
+              "Confirmar: los productos seleccionados deben eliminarse en lote."
+            ],
+            expected: "Borrado seguro con confirmación previa."
+          },
+          {
+            id: "PROD-04",
+            title: "Importación y Exportación de Archivos Excel (.xlsx, .xls)",
+            severity: "critical",
+            connectedTo: "Productos.jsx (handleExportExcel, handleFileUpload)",
+            description: "Comprobar los botones 'Exportar' e 'Importar' de la pantalla de Productos.",
+            steps: [
+              "Hacer clic en 'Exportar': debe descargarse un archivo .xlsx con el catálogo completo de productos.",
+              "Hacer clic en 'Importar': seleccionar un archivo Excel para cargar productos en masa.",
+              "Verificar que los productos del archivo se incorporen o actualicen correctamente."
+            ],
+            expected: "Importación y exportación de planillas Excel rápida y compatible."
+          },
+          {
+            id: "PROD-05",
+            title: "Configuración de Combos y Packs (Función Plan Pro)",
+            severity: "high",
+            connectedTo: "Productos.jsx (createCombo)",
+            description: "Crear un combo agrupando productos existentes con precio especial.",
+            steps: [
+              "Hacer clic en el botón 'Combos' en la barra superior (si es Plan Básico debe advertir que es exclusivo Pro).",
+              "Si es Pro, añadir productos componentes (ej: 1x Fernet + 2x Coca-Cola) y definir el precio del combo.",
+              "Guardar combo: debe figurar con el badge 'Combo' en el catálogo."
+            ],
+            expected: "Creación de combos que luego descuentan componentes individuales al venderse en el POS."
+          },
+          {
+            id: "PROD-06",
+            title: "Gestión de Categorías con Selector de Emojis",
+            severity: "medium",
+            connectedTo: "Productos.jsx (setShowCategoryModal)",
+            description: "Administrar categorías, subcategorías y sus emojis representativos.",
+            steps: [
+              "Hacer clic en el botón 'Categorías'.",
+              "Crear una categoría nueva seleccionando un emoji temático de la grilla (ej: 🍬 Golosinas).",
+              "Agregar subcategorías.",
+              "Guardar y verificar que aparezca disponible en el selector de categorías."
+            ],
+            expected: "Organización visual clara con iconos que facilitan la búsqueda."
+          },
+          {
+            id: "PROD-07",
+            title: "Filtros Desplegables en Catálogo",
+            severity: "medium",
+            connectedTo: "Productos.jsx (showFilters)",
+            description: "Comprobar el botón 'Filtros' de la barra de búsqueda.",
+            steps: [
+              "Hacer clic en 'Filtros': se despliega el panel con Categoría, Subcategoría, Estado, Tipo y Marca.",
+              "Aplicar filtros combinados: la tabla debe mostrar solo los productos que cumplan las condiciones.",
+              "Hacer clic en la 'X' roja para limpiar todos los filtros."
+            ],
+            expected: "Filtrado reactivo instantáneo en memoria."
+          }
+        ]
+      },
+      {
+        id: "sec-inventory",
+        title: "4. Inventario",
+        icon: "📊",
+        description: "Supervisión de stock, alerta de bajo stock, botón Reponer B2B, edición de cantidades con Edit2 y borrado.",
+        items: [
+          {
+            id: "INV-01",
+            title: "Visualización de Stock y Alertas de Quiebre",
+            severity: "critical",
+            connectedTo: "Inventario.jsx",
+            description: "Revisar la tabla de inventario y el código de colores según el nivel de stock.",
+            steps: [
+              "Ir a la pestaña 'Inventario'.",
+              "Verificar que los productos con Stock = 0 se destaquen con fondo rojizo suave.",
+              "Verificar que los productos con Stock ≤ Stock Mínimo de alerta se destaquen con fondo anaranjado y texto en rojo.",
+              "Comprobar las columnas: Producto, Categoría/Subcategoría, Proveedor, Estado (toggle) y Stock."
+            ],
+            expected: "Identificación visual inmediata de los productos críticos o agotados."
+          },
+          {
+            id: "INV-02",
+            title: "Botón 'Reponer B2B' en Inventario",
+            severity: "high",
+            connectedTo: "Inventario.jsx -> Ofertas B2B -> stockOfferMatcher",
+            description: "Comprobar el botón directo de reposición en la fila del producto.",
+            steps: [
+              "Localizar en el inventario un producto que coincida semánticamente con una campaña B2B activa.",
+              "Verificar que en su columna de Acciones aparezca el botón azul '🏷️ Reponer B2B'.",
+              "Hacer clic en 'Reponer B2B': debe abrir directamente el modal de la oferta mayorista para consultar o pedir por WhatsApp."
+            ],
+            expected: "Conexión directa entre el producto agotado y el proveedor mayorista en 1 clic."
+          },
+          {
+            id: "INV-03",
+            title: "Edición de Stock y Datos con Botón Lápiz (`Edit2`)",
+            severity: "critical",
+            connectedTo: "Inventario.jsx (startEdit, handleSaveProduct)",
+            description: "Ajustar existencias, stock de alerta o costos de un producto.",
+            steps: [
+              "En la fila del producto, hacer clic en el botón de lápiz azul (Edit2).",
+              "Se abre la vista de edición: modificar Stock Actual (ej: pasar de 5 a 12 por recuento físico) o Stock Mínimo.",
+              "Guardar cambios.",
+              "Verificar que la tabla de inventario y el POS muestren la cantidad corregida inmediatamente."
+            ],
+            expected: "Ajuste rápido de inventario sin fricciones."
+          },
+          {
+            id: "INV-04",
+            title: "Filtros Desplegables de Inventario",
+            severity: "medium",
+            connectedTo: "Inventario.jsx (showFilters)",
+            description: "Comprobar el panel de filtros por Categoría, Subcategoría, Proveedor y Estado.",
+            steps: [
+              "Hacer clic en 'Filtros' al lado del buscador de inventario.",
+              "Seleccionar un proveedor específico: la tabla debe mostrar únicamente los productos provistos por él.",
+              "Probar filtro de estado 'Activos' / 'Inactivos'."
+            ],
+            expected: "Filtrado preciso para auditorías selectivas por proveedor o rubro."
+          },
+          {
+            id: "INV-05",
+            title: "Toggle de Activación / Desactivación Rápida",
+            severity: "medium",
+            connectedTo: "Inventario.jsx -> updateProduct",
+            description: "Inhabilitar temporalmente un producto sin borrarlo.",
+            steps: [
+              "Hacer clic en el interruptor (toggle-switch) en la columna 'Estado' de un producto.",
+              "Desactivarlo: el producto pasa a estar inactivo.",
+              "Ir al POS: verificar que el producto inactivo ya NO aparezca disponible para la venta."
+            ],
+            expected: "Control rápido para ocultar productos discontinuados temporalmente."
+          }
+        ]
+      },
+      {
+        id: "sec-purchases",
+        title: "5. Compras a Proveedores",
+        icon: "🚚",
+        description: "Recepción de compras, aumento automático de stock, impacto en caja si es en efectivo, rollback y proveedores.",
+        items: [
+          {
+            id: "PUR-01",
+            title: "Registro de Nueva Compra con Aumento Automático de Stock",
+            severity: "critical",
+            connectedTo: "Compras.jsx -> useKiosco (addPurchase)",
+            description: "Cargar una compra de mercadería a un proveedor.",
+            steps: [
+              "Ir a 'Compras' y hacer clic en '+ Nueva Compra'.",
+              "Buscar y seleccionar productos, ingresando Cantidad comprada y Costo unitario.",
+              "Hacer clic en 'Continuar' y confirmar compra.",
+              "Ir a Inventario: verificar que el stock de los productos comprados haya aumentado automáticamente."
+            ],
+            expected: "Ingreso formal de mercadería con impacto directo en las existencias."
+          },
+          {
+            id: "PUR-02",
+            title: "Actualización de Costo y Precio de Venta desde la Compra",
+            severity: "critical",
+            connectedTo: "Compras.jsx -> addPurchase",
+            description: "Verificar si el nuevo costo recalcula el precio de venta manteniendo el margen.",
+            steps: [
+              "Comprar un producto ingresando un costo mayor al que tenía registrado.",
+              "Verificar que en la pantalla de compra permita fijar el nuevo precio o margen.",
+              "Confirmar compra.",
+              "Revisar el producto en Catálogo: el costo y el precio al público deben haberse actualizado."
+            ],
+            expected: "Protección automática de la rentabilidad del comercio ante aumentos de precios del proveedor."
+          },
+          {
+            id: "PUR-03",
+            title: "Impacto en Caja según Medio de Pago (Efectivo vs Banco)",
+            severity: "critical",
+            connectedTo: "Compras.jsx -> Turnos/Caja",
+            description: "Comprobar que las compras pagadas con dinero de la caja resten del efectivo físico.",
+            steps: [
+              "Teniendo la caja abierta con efectivo.",
+              "Registrar una compra seleccionando método de pago 'Efectivo'.",
+              "Ir al POS y revisar 'Mi Caja': el saldo en billetes DEBE haber disminuido en el importe de la compra.",
+              "Registrar otra compra con método 'Transferencia': el efectivo en caja NO debe disminuir."
+            ],
+            expected: "Diferenciación exacta entre egresos de billetes de la gaveta y pagos por cuenta bancaria."
+          },
+          {
+            id: "PUR-04",
+            title: "Edición de Compra con Rollback Automático y Auditoría",
+            severity: "critical",
+            connectedTo: "useKiosco (updatePurchase)",
+            description: "Modificar cantidades o costos de una compra ya asentada.",
+            steps: [
+              "En el listado de compras, hacer clic en el botón de editar de una compra previa.",
+              "Modificar las cantidades compradas o costos.",
+              "Guardar cambios.",
+              "Verificar en Inventario: el stock se corrige automáticamente revirtiendo las cantidades viejas y aplicando las nuevas.",
+              "Verificar que la compra quede marcada como 'Editada' con su historial de modificaciones."
+            ],
+            expected: "Rollback impecable de stock y caja manteniendo la trazabilidad histórica."
+          },
+          {
+            id: "PUR-05",
+            title: "Gestión de Proveedores (ABM de Proveedores)",
+            severity: "medium",
+            connectedTo: "Compras.jsx (showSupplierModal)",
+            description: "Crear, editar y eliminar proveedores registrados.",
+            steps: [
+              "Hacer clic en el botón 'Proveedores'.",
+              "Dar de alta un nuevo proveedor con Nombre, Teléfono, Email y Dirección.",
+              "Verificar que esté disponible inmediatamente en el selector al cargar una nueva compra."
+            ],
+            expected: "Directorio de proveedores organizado y reutilizable."
+          }
+        ]
+      },
+      {
+        id: "sec-clients",
+        title: "6. Clientes & Cuentas Corrientes (Fiado)",
+        icon: "👥",
+        description: "Ficha de cliente (Nombre, CUIT, Teléfono), acumulación de deuda al fiar, cobro de deuda en caja y WhatsApp.",
+        items: [
+          {
+            id: "CLI-01",
+            title: "Alta y Edición de Cliente (Nombre, CUIT, Teléfono)",
+            severity: "high",
+            connectedTo: "Clientes.jsx",
+            description: "Registrar un cliente en el sistema.",
+            steps: [
+              "Ir a 'Clientes' y hacer clic en '+ Nuevo Cliente'.",
+              "Ingresar: Nombre completo, CUIT/DNI y Teléfono de contacto.",
+              "Guardar.",
+              "Verificar que aparezca en el listado con Deuda inicial $0."
+            ],
+            expected: "Ficha de cliente almacenada y lista para operar en el POS."
+          },
+          {
+            id: "CLI-02",
+            title: "Incremento Automático de Deuda al Vender al Fiado",
+            severity: "critical",
+            connectedTo: "POS -> Clientes",
+            description: "Comprobar que una venta al fiado sume a la cuenta corriente del cliente.",
+            steps: [
+              "En el POS, presionar F3, elegir al cliente registrado y cobrar seleccionando método 'Fiado'.",
+              "Ir a la pantalla de Clientes.",
+              "Comprobar que el cliente figure en estado 'Deudor' con el monto exacto de la deuda acumulada."
+            ],
+            expected: "Reflejo automático de la cuenta corriente tras la venta."
+          },
+          {
+            id: "CLI-03",
+            title: "Cobro de Deuda (Total o Parcial) e Ingreso a Caja",
+            severity: "critical",
+            connectedTo: "Clientes.jsx -> payDebt -> Caja",
+            description: "Registrar el pago de un cliente que viene a saldar su fiado.",
+            steps: [
+              "En la ficha del cliente con deuda, hacer clic en el botón verde de cobrar deuda.",
+              "Ingresar el importe abonado y seleccionar método 'Efectivo'.",
+              "Confirmar pago.",
+              "Verificar que la deuda del cliente disminuya en ese monto.",
+              "Ir al POS -> 'Mi Caja': verificar que el efectivo en caja haya aumentado en esa cantidad con el movimiento 'Cobro de deuda - Cliente [Nombre]'."
+            ],
+            expected: "Disminución de la deuda e ingreso del dinero en la caja del turno activo."
+          },
+          {
+            id: "CLI-04",
+            title: "Recordatorio de Deuda por WhatsApp en 1 Clic",
+            severity: "medium",
+            connectedTo: "Clientes.jsx (openWhatsAppReminder)",
+            description: "Enviar mensaje de cobro al celular del cliente.",
+            steps: [
+              "En la tarjeta del cliente deudor, presionar el icono de WhatsApp.",
+              "Debe abrirse el chat de WhatsApp con un mensaje predeterminado que informa el saldo adeudado y solicita regularizarlo."
+            ],
+            expected: "Apertura rápida del canal de cobranza por WhatsApp."
+          }
+        ]
+      },
+      {
+        id: "sec-reports",
+        title: "7. Reportes y Rendición",
+        icon: "📈",
+        description: "Panel de Ventas vs Cierres de Turno, filtros por medio de pago, Rentabilidad Neta (Plan Pro) y arqueos.",
+        items: [
+          {
+            id: "REP-01",
+            title: "Pestaña 'Panel de Ventas' vs 'Cierres de Turno'",
+            severity: "high",
+            connectedTo: "Reportes.jsx (reportView)",
+            description: "Comprobar los dos modos de auditoría en la pantalla de Reportes.",
+            steps: [
+              "Ir a 'Reportes' en la barra inferior.",
+              "Hacer clic en 'Panel de Ventas': muestra las ventas del turno o históricas con sus medios de pago y tarjetas KPI.",
+              "Hacer clic en 'Cierres de Turno': muestra el historial de turnos cerrados con sus fechas, cajeros y arqueos de caja."
+            ],
+            expected: "Separación clara entre auditoría de ventas individuales y control de cierres de caja."
+          },
+          {
+            id: "REP-02",
+            title: "Filtro por Medio de Pago en Ventas",
+            severity: "high",
+            connectedTo: "Reportes.jsx (filterMethod)",
+            description: "Segmentar las ventas según cómo fueron cobradas.",
+            steps: [
+              "En el Panel de Ventas, desplegar el selector de medios (Todos, Efectivo, Tarjeta, Transferencia, QR, Fiado).",
+              "Seleccionar 'Efectivo': solo deben listarse las operaciones en efectivo y el Total Facturado debe recalcularse para ese medio.",
+              "Seleccionar 'Tarjeta': verificar que filtre únicamente cobros con tarjeta."
+            ],
+            expected: "Conciliación rápida de ingresos por cada canal de cobranza."
+          },
+          {
+            id: "REP-03",
+            title: "Modal de Rentabilidad Neta Real (Función Plan Pro)",
+            severity: "critical",
+            connectedTo: "Reportes.jsx (setShowProfitModal)",
+            description: "Comprobar el cálculo de ganancias reales descontando el costo de la mercadería vendida.",
+            steps: [
+              "Hacer clic en el botón 'Rentabilidad Neta' (si es Plan Básico debe advertir que es exclusivo Pro).",
+              "Si es Pro, seleccionar rango de fechas (Desde - Hasta).",
+              "Revisar los indicadores: Total Vendido, Costo Mercadería Vendida, Ganancia Neta Real ($) y Margen Bruto (%)."
+            ],
+            expected: "Información financiera fidedigna sobre el beneficio económico real del negocio."
+          },
+          {
+            id: "REP-04",
+            title: "Detalle de Venta / Ticket Individual (Botón Ojo)",
+            severity: "medium",
+            connectedTo: "Reportes.jsx (selectedSale)",
+            description: "Ver el desglose de productos que integraron una venta pasada.",
+            steps: [
+              "En la tabla de ventas, hacer clic en el icono del ojo (Eye) de cualquier fila.",
+              "Se abre el modal con el ticket detallado: fecha, cliente, medio de pago, lista de productos con precios unitarios y total."
+            ],
+            expected: "Consulta rápida para resolver dudas sobre ventas previas."
+          },
+          {
+            id: "REP-05",
+            title: "Auditoría de Cierres de Turno Archivados",
+            severity: "critical",
+            connectedTo: "Reportes.jsx (selectedShift)",
+            description: "Revisar un cierre de caja realizado días atrás.",
+            steps: [
+              "Ir a 'Cierres de Turno'.",
+              "Hacer clic en un turno archivado: debe desplegar el informe completo con fecha de apertura/cierre, usuario operador, fondo inicial, total facturado, total fiado, dinero esperado vs dinero contado y diferencia de arqueo."
+            ],
+            expected: "Control permanente e inalterable de la recaudación de cada turno."
+          }
+        ]
+      },
+      {
+        id: "sec-security",
+        title: "8. Usuarios, Roles & Candado Global (Admin Guard)",
+        icon: "🔒",
+        description: "Roles Admin y Vendedor, PIN de 4 dígitos, bloqueo automático de pantallas administrativas y límites de usuarios.",
+        items: [
+          {
+            id: "SEC-01",
+            title: "Candado Global de Seguridad (Admin Guard)",
+            severity: "critical",
+            connectedTo: "App.jsx (Guard Overlay)",
+            description: "Bloquear acceso a zonas críticas si la sesión activa es de rol Vendedor.",
+            steps: [
+              "Abrir la caja con un usuario de rol 'Vendedor'.",
+              "Intentar hacer clic en: 'Productos', 'Inventario', 'Usuarios', 'Reportes' o 'Config'.",
+              "Debe desplegarse el overlay oscuro: 'Acceso Restringido - Ingresa el PIN Maestro para continuar'.",
+              "Ingresar un PIN incorrecto: debe arrojar error.",
+              "Ingresar el PIN de un Administrador: la pantalla se desbloquea inmediatamente."
+            ],
+            expected: "Protección total para que los empleados no vean costos, ganancias ni alteren productos."
+          },
+          {
+            id: "SEC-02",
+            title: "Alta y Modificación de Usuarios (Roles Admin / Vendedor)",
+            severity: "high",
+            connectedTo: "Usuarios.jsx",
+            description: "Crear cuentas de acceso con PIN numérico personal.",
+            steps: [
+              "Ir a 'Usuarios' como Administrador.",
+              "Hacer clic en '+ Nuevo Usuario'.",
+              "Ingresar: Nombre, Email (opcional), Rol (Admin o Vendedor) y PIN.",
+              "Guardar y verificar que el usuario quede habilitado."
+            ],
+            expected: "Separación clara de perfiles de usuario con credenciales propias."
+          },
+          {
+            id: "SEC-03",
+            title: "Límites de Usuarios según Plan (Básico máx 2, Pro máx 5)",
+            severity: "high",
+            connectedTo: "Usuarios.jsx (handleStartCreate)",
+            description: "Verificar el tope comercial de cuentas de usuario.",
+            steps: [
+              "Con Plan Básico, intentar crear un 3er usuario: el sistema debe bloquear indicando que el Plan Básico permite hasta 2 usuarios.",
+              "Con Plan Pro, el límite se amplía hasta 5 usuarios."
+            ],
+            expected: "Cumplimiento estricto de las reglas comerciales de licenciamiento."
+          }
+        ]
+      },
+      {
+        id: "sec-config",
+        title: "9. Configuración, Onboarding, Licencias & Conectividad",
+        icon: "⚙️",
+        description: "Perfil comercial, catálogo offline de 24 provincias argentinas, activación Plan Pro con clave SHA-256 y monitor de red.",
+        items: [
+          {
+            id: "CFG-01",
+            title: "Edición de Perfil Comercial y Ubicación Geográfica",
+            severity: "high",
+            connectedTo: "Configuracion.jsx -> installationService",
+            description: "Actualizar datos del negocio y localización en Argentina.",
+            steps: [
+              "Ir a 'Config'.",
+              "Modificar: Nombre de Fantasía, Teléfono, Dirección, Provincia y Localidad (usando el catálogo offline).",
+              "Hacer clic en 'Guardar Información': debe persistir localmente y sincronizarse hacia Supabase si hay red."
+            ],
+            expected: "Perfil actualizado y geolocalizado para la asignación de ofertas B2B."
+          },
+          {
+            id: "CFG-02",
+            title: "Activación Criptográfica de Licencia Plan Pro",
+            severity: "critical",
+            connectedTo: "Configuracion.jsx -> generador-licencias",
+            description: "Activar el Plan Pro mediante la clave generada a partir del Installation ID.",
+            steps: [
+              "Copiar el 'ID de Instalación' mostrado en Configuración.",
+              "Abrir 'generador-licencias/licenciaskioscoprox.html', pegar el ID y generar la clave.",
+              "Pegar la clave en el campo 'Clave de Licencia' de la app y presionar 'Activar'.",
+              "El plan debe cambiar inmediatamente a 'Plan Pro' y desbloquear todas las funciones premium.",
+              "Ingresar una clave falsa: debe rechazarla sin alterar el plan."
+            ],
+            expected: "Validación criptográfica local segura basada en hardware inmutable."
+          },
+          {
+            id: "CFG-03",
+            title: "Monitor de Conectividad Activa (`connectivityService`)",
+            severity: "high",
+            connectedTo: "connectivityService.js -> Configuracion.jsx",
+            description: "Comprobar el estado real de la conexión a internet y backend.",
+            steps: [
+              "En Configuración, observar el recuadro de Conectividad.",
+              "Con internet: debe mostrar '🟢 En Línea' y la latencia en milisegundos.",
+              "Desconectar internet: debe cambiar a '🔴 Sin Conexión' e informar que el sistema opera en modo local."
+            ],
+            expected: "Diagnóstico claro y en vivo del estado de la red."
+          },
+          {
+            id: "CFG-04",
+            title: "Chequeo Manual de Actualizaciones (`updateService`)",
+            severity: "high",
+            connectedTo: "updateService.js",
+            description: "Comprobar el botón de búsqueda de nuevas versiones.",
+            steps: [
+              "Hacer clic en 'Buscar Actualizaciones'.",
+              "Debe consultar el repositorio de releases de GitHub e informar si la versión actual está al día o si hay una descarga disponible."
+            ],
+            expected: "Búsqueda silenciosa de actualizaciones sin trabar la interfaz."
+          },
+          {
+            id: "CFG-05",
+            title: "Herramientas de Demostración Comercial y Formateo",
+            severity: "medium",
+            connectedTo: "Configuracion.jsx -> demoDataGenerator",
+            description: "Cargar datos de prueba realistas o limpiar la base para un cliente real.",
+            steps: [
+              "Probar 'Cargar Datos Demo de 5 Meses': debe poblar el sistema con ventas, compras, productos y turnos para mostrar la app a prospectos.",
+              "Probar 'Limpiar Todos los Datos': debe solicitar confirmación y dejar el sistema en blanco listo para el comercio real."
+            ],
+            expected: "Facilidad para hacer demos comerciales y dejar instalaciones limpias."
+          }
+        ]
+      },
+      {
+        id: "sec-admin",
+        title: "10. Panel Administrador B2B (`panel-admin/index.html`)",
+        icon: "🎛️",
+        description: "Creación de campañas, Live Preview, segmentación geográfica, métricas con CTR, control de comercios y Remote Config.",
+        items: [
+          {
+            id: "ADM-01",
+            title: "Creación de Campañas B2B con Live Preview",
+            severity: "critical",
+            connectedTo: "panel-admin/index.html -> Supabase (b2b_campaigns)",
+            description: "Crear una campaña publicitaria mayorista desde el panel central.",
+            steps: [
+              "Abrir 'panel-admin/index.html' en el navegador.",
+              "Hacer clic en '+ Nueva Campaña'.",
+              "Ingresar: Título, Código, Descripción, Precios (Oferta y Regular), Compra Mínima, Mayorista y Teléfono WhatsApp.",
+              "Colocar URL de imagen: comprobar que la tarjeta 'Live Preview' de la derecha muestre el diseño en tiempo real.",
+              "Guardar y verificar que aparezca en la lista de campañas activas."
+            ],
+            expected: "Creación de anuncios con previsualización fidedigna de cómo se verá en las terminales."
+          },
+          {
+            id: "ADM-02",
+            title: "Segmentación Geográfica de Campañas por Provincias",
+            severity: "critical",
+            connectedTo: "panel-admin -> target_provinces",
+            description: "Destinar una oferta únicamente a los comercios de ciertas provincias.",
+            steps: [
+              "Al crear o editar una campaña, seleccionar 'Zonas Específicas'.",
+              "Marcar una provincia determinada (ej: San Luis) y guardar.",
+              "Verificar que solo las terminales radicadas en esa provincia descarguen la campaña."
+            ],
+            expected: "Publicidad segmentada según la cobertura logística del distribuidor."
+          },
+          {
+            id: "ADM-03",
+            title: "Ciclo de Vida de Campañas (Pausar, Finalizar, Reactivar)",
+            severity: "high",
+            connectedTo: "panel-admin (status)",
+            description: "Controlar el estado operativo de las promociones.",
+            steps: [
+              "Pausar una campaña: debe dejar de mostrarse en los kioscos.",
+              "Finalizar la campaña: pasa al archivo de finalizadas.",
+              "Reactivar: vuelve a estar activa y se redistribuye a las terminales."
+            ],
+            expected: "Control centralizado sobre la vigencia de las pautas comerciales."
+          },
+          {
+            id: "ADM-04",
+            title: "Métricas B2B Reales (Paginación Supabase >1.000 Eventos)",
+            severity: "critical",
+            connectedTo: "panel-admin (loadMetrics) -> Supabase",
+            description: "Comprobar el cálculo de impresiones, aperturas y clics en WhatsApp con alto volumen.",
+            steps: [
+              "Ir a 'Métricas y Clics'.",
+              "Verificar que el panel consulte los eventos mediante paginación por lotes superando el tope de 1.000 filas de PostgREST.",
+              "Verificar los indicadores: Total Impresiones, Total Aperturas, Total WhatsApp Clicks y el CTR global (%) exacto."
+            ],
+            expected: "Métricas consolidadas y exactas para facturar a los anunciantes."
+          },
+          {
+            id: "ADM-05",
+            title: "Informe de Rendimiento por Distribuidor en PDF",
+            severity: "high",
+            connectedTo: "panel-admin (distributor performance)",
+            description: "Emitir el reporte individual para presentar a una marca mayorista.",
+            steps: [
+              "Hacer clic en 'Ver Rendimiento' de un mayorista.",
+              "Revisar el modal con las estadísticas de sus ofertas.",
+              "Hacer clic en 'Imprimir Informe PDF': debe abrir el diálogo de impresión con un formato ejecutivo en blanco y negro sin barras laterales."
+            ],
+            expected: "Documento profesional para respaldar la inversión del mayorista."
+          },
+          {
+            id: "ADM-06",
+            title: "Monitoreo de Comercios Activos (Heartbeats y Versiones)",
+            severity: "high",
+            connectedTo: "panel-admin -> merchants tab",
+            description: "Supervisar el estado de cada kiosco que utiliza Simple ProX.",
+            steps: [
+              "Ir a 'Comercios Activos'.",
+              "Revisar las terminales con: Nombre del Kiosco, Localidad, Provincia, Versión de la app (ej: 'v1.3.9'), Plan (Básico/Pro) y el semáforo de conexión (En línea / Reciente / Inactivo)."
+            ],
+            expected: "Control operativo central de todo el parque de terminales instaladas."
+          },
+          {
+            id: "ADM-07",
+            title: "Editor de Remote Config Centralizado",
+            severity: "high",
+            connectedTo: "panel-admin -> settings tab",
+            description: "Modificar parámetros operativos de la red desde el panel.",
+            steps: [
+              "Ir a 'Configuración API'.",
+              "Modificar el interruptor de banners o el intervalo de rotación.",
+              "Guardar Configuración Remota: debe actualizarse en Supabase y transmitirse a las terminales."
+            ],
+            expected: "Capacidad de cambiar reglas operativas de forma remota sin reinstalar clientes."
+          }
+        ]
+      },
+      {
+        id: "sec-electron",
+        title: "11. Integración Electron & Sistema Windows",
+        icon: "💻",
+        description: "Aislamiento de contexto, enlaces externos seguros, auto-update que no interrumpe turnos y cierre protegido.",
+        items: [
+          {
+            id: "ELC-01",
+            title: "Inhibición de Cierre de Ventana con Turno Abierto",
+            severity: "critical",
+            connectedTo: "App.jsx -> electron/main.js (onAppCloseRequested)",
+            description: "Intentar cerrar la aplicación teniendo la caja abierta.",
+            steps: [
+              "Con la caja abierta, hacer clic en la 'X' superior de la ventana de Windows.",
+              "La ventana NO debe cerrarse y debe aparecer el modal: 'Hay un turno abierto. Si sales ahora el turno permanecerá activo... ¿Estás seguro?'.",
+              "Probar 'Cancelar': permanece en la app.",
+              "Probar 'Sí, salir': cierra la app."
+            ],
+            expected: "Previene cierres accidentales que dejen turnos abiertos sin control."
+          },
+          {
+            id: "ELC-02",
+            title: "Apertura de Enlaces Externos en Navegador del Sistema",
+            severity: "critical",
+            connectedTo: "window.api.openExternal",
+            description: "Comprobar que enlaces a WhatsApp o soporte no se abran dentro de la ventana de la app.",
+            steps: [
+              "Hacer clic en cualquier botón de WhatsApp.",
+              "Debe abrirse en Chrome o Edge del usuario sin alterar la ventana de Simple ProX."
+            ],
+            expected: "Navegación nativa y fluida sin romper el contenedor de Electron."
+          },
+          {
+            id: "ELC-03",
+            title: "Auto-Update Seguro (Inhibe Reinicio Forzado con Caja Abierta)",
+            severity: "critical",
+            connectedTo: "updateService.js -> electron-updater",
+            description: "Comprobar que una actualización descargada nunca reinicie la app durante una venta.",
+            steps: [
+              "Si una actualización está lista y la caja está abierta, el sistema debe postergar la instalación y mostrar únicamente una pastilla informativa discreta.",
+              "Solo cuando la caja se cierra formalmente se permite aplicar la actualización."
+            ],
+            expected: "Cero pérdidas de ventas o cortes intempestivos durante la atención."
+          },
+          {
+            id: "ELC-04",
+            title: "Persistencia de Datos en Almacenamiento Local de Windows",
+            severity: "critical",
+            connectedTo: "LocalStorage / AppData",
+            description: "Comprobar que los datos persistan tras apagar la computadora.",
+            steps: [
+              "Cerrar la aplicación completamente.",
+              "Volver a ejecutar el archivo de Simple ProX.",
+              "Verificar que todos los productos, ventas, clientes, compras y turnos se encuentren intactos."
+            ],
+            expected: "Persistencia total de los registros comerciales."
+          }
+        ]
+      },
+      {
+        id: "sec-e2e",
+        title: "12. Flujos Cruzados e Integración Extremo a Extremo (E2E)",
+        icon: "🔁",
+        description: "Circuitos completos que prueban la interconexión entre ventas, compras, caja, stock, clientes y ofertas.",
+        items: [
+          {
+            id: "E2E-01",
+            title: "Circuito 1: Venta Fiada -> Deuda Cliente -> Cobro de Fiado en Efectivo -> Caja",
+            severity: "critical",
+            connectedTo: "POS <-> Clientes <-> Caja",
+            description: "Probar el ciclo completo de la cuenta corriente del cliente.",
+            steps: [
+              "1. Abrir turno con $10.000 en efectivo.",
+              "2. En el POS, seleccionar al cliente 'Juan Pérez' y cobrar $3.000 con método 'Fiado'.",
+              "3. Verificar que la caja siga en $10.000 y Juan deba $3.000.",
+              "4. Ir a Clientes y cobrarle $2.000 en efectivo a Juan.",
+              "5. Verificar que la deuda de Juan baje a $1.000 y el efectivo en caja suba a $12.000."
+            ],
+            expected: "Cuadre contable exacto entre mostrador, cuenta corriente y gaveta de dinero."
+          },
+          {
+            id: "E2E-02",
+            title: "Circuito 2: Compra a Proveedor -> Descuento de Caja -> Aumento Stock -> Venta con Nuevo Precio",
+            severity: "critical",
+            connectedTo: "Compras <-> Caja <-> Productos <-> POS",
+            description: "Probar la recepción de mercadería pagada en efectivo y su posterior venta al público.",
+            steps: [
+              "1. Con caja abierta en $20.000, registrar una compra de 10 alfajores a $500 c/u pagada en Efectivo ($5.000).",
+              "2. Verificar que el efectivo en caja baje a $15.000 y el stock de alfajores aumente en 10.",
+              "3. En el POS, vender 2 alfajores: debe tomar el nuevo precio fijado y descontar 2 del stock."
+            ],
+            expected: "Ciclo de abastecimiento y venta perfectamente articulado."
+          },
+          {
+            id: "E2E-03",
+            title: "Circuito 3: Quiebre de Stock -> Alerta B2B en POS e Inventario -> Carrito B2B -> WhatsApp",
+            severity: "critical",
+            connectedTo: "Inventario <-> Ofertas B2B <-> Carrito B2B <-> WhatsApp",
+            description: "Probar la solución completa de reposición ante producto agotado.",
+            steps: [
+              "1. Vender un producto hasta que su stock quede en quiebre (≤ stock mínimo).",
+              "2. Observar la sugerencia en el POS o ir a Inventario y presionar 'Reponer B2B'.",
+              "3. Agregar la cantidad requerida al Carrito B2B.",
+              "4. Abrir el Carrito B2B y presionar 'Enviar Pedido por WhatsApp'.",
+              "5. Verificar el mensaje consolidado generado con los datos de entrega de la tienda."
+            ],
+            expected: "Reposición rápida con mayoristas que soluciona el quiebre de stock en segundos."
+          },
+          {
+            id: "E2E-04",
+            title: "Circuito 4: Publicar Campaña en Panel Admin -> Kiosco -> Métricas en Panel",
+            severity: "critical",
+            connectedTo: "Panel Admin <-> Supabase <-> Kiosco (useOfertas) <-> Métricas",
+            description: "Probar el circuito publicitario completo desde la perspectiva del mayorista.",
+            steps: [
+              "1. Crear una campaña nueva en el Panel Admin con vigencia actual y código 'PROMO-TEST'.",
+              "2. En la terminal de Simple ProX, verificar que en el siguiente ciclo de sincronización aparezca el anuncio en el banner.",
+              "3. Hacer clic en el banner y presionar el botón de WhatsApp.",
+              "4. Recargar el Panel Admin en 'Métricas': verificar que se contabilicen la impresión, apertura y clic en WhatsApp."
+            ],
+            expected: "Comprueba el modelo de negocio publicitario de punta a punta."
+          },
+          {
+            id: "E2E-05",
+            title: "Circuito 5: Prueba de Resistencia 100% Offline durante toda la jornada",
+            severity: "critical",
+            connectedTo: "Arquitectura Offline-First",
+            description: "Probar un día entero de trabajo sin conexión a internet.",
+            steps: [
+              "1. Desconectar la computadora completamente de internet.",
+              "2. Abrir turno, realizar múltiples ventas en efectivo y tarjeta, registrar compras y cobrar fiados.",
+              "3. Cerrar el turno y generar el arqueo.",
+              "4. Verificar que no haya habido ningún bloqueo o error en pantalla.",
+              "5. Reconectar internet: verificar que el monitor pase a '🟢 En Línea' y los datos se sincronicen silenciosamente."
+            ],
+            expected: "Prueba de fuego superada: el comercio nunca se detiene aunque se caiga internet."
+          }
+        ]
+      }
+    ];
+
+    const STORAGE_KEY = 'kioscoprox_qa_checklist_v2';
+    let checklistState = {};
+    let currentFilter = 'all';
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          checklistState = JSON.parse(saved);
+        }
+      } catch (e) {
+        console.warn('Error loading checklist state:', e);
+        checklistState = {};
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(checklistState));
+      } catch (e) {
+        console.error('Error saving checklist state:', e);
+      }
+      updateStats();
+    }
+
+    function renderChecklist() {
+      const wrapper = document.getElementById('sections-wrapper');
+      wrapper.innerHTML = '';
+
+      CHECKLIST_DATA.forEach((section) => {
+        const sectionBox = document.createElement('div');
+        sectionBox.className = 'section-box';
+        sectionBox.id = `box-${section.id}`;
+
+        const header = document.createElement('div');
+        header.className = 'section-header';
+        header.onclick = () => toggleSection(section.id);
+
+        header.innerHTML = `
+          <div class="section-title-group">
+            <div class="section-icon-badge">${section.icon}</div>
+            <div class="section-title">
+              <h2>${section.title}</h2>
+              <p>${section.description}</p>
+            </div>
+          </div>
+          <div class="section-meta">
+            <span class="section-badge" id="badge-${section.id}">0 / ${section.items.length}</span>
+            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" onclick="event.stopPropagation(); markSectionOk('${section.id}')" title="Marcar todos los ítems de esta sección como Aprobados">
+              ✓ Todo OK
+            </button>
+            <svg class="toggle-arrow" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </div>
+        `;
+
+        const content = document.createElement('div');
+        content.className = 'section-content';
+        content.id = `content-${section.id}`;
+
+        section.items.forEach(item => {
+          const itemState = checklistState[item.id] || { status: 'pending', notes: '' };
+          const itemCard = document.createElement('div');
+          itemCard.className = `check-item status-${itemState.status}`;
+          itemCard.id = `card-${item.id}`;
+          itemCard.setAttribute('data-severity', item.severity);
+          itemCard.setAttribute('data-status', itemState.status);
+
+          const sevClass = item.severity === 'critical' ? 'sev-critical' : (item.severity === 'high' ? 'sev-high' : 'sev-medium');
+          const sevLabel = item.severity === 'critical' ? 'Crítico' : (item.severity === 'high' ? 'Alto' : 'Medio');
+
+          itemCard.innerHTML = `
+            <div class="status-switch">
+              <button class="status-btn btn-ok ${itemState.status === 'ok' ? 'active' : ''}" onclick="setItemStatus('${item.id}', 'ok')" title="Marcar como Aprobado / OK">
+                ✓
+              </button>
+              <button class="status-btn btn-fail ${itemState.status === 'fail' ? 'active' : ''}" onclick="setItemStatus('${item.id}', 'fail')" title="Marcar como Falla / A Corregir">
+                ✕
+              </button>
+            </div>
+
+            <div class="item-body">
+              <div class="item-header">
+                <span class="item-code">${item.id}</span>
+                <span class="severity-badge ${sevClass}">${sevLabel}</span>
+                ${item.connectedTo ? `<span class="tag-connection">🔗 ${item.connectedTo}</span>` : ''}
+                <span class="item-title">${item.title}</span>
+              </div>
+
+              <p class="item-description">${item.description}</p>
+
+              <div class="item-steps">
+                <strong>Pasos para verificar:</strong>
+                <ol>
+                  ${item.steps.map(st => `<li>${st}</li>`).join('')}
+                </ol>
+                <div class="item-expected">
+                  <span>🎯</span>
+                  <span><strong>Comportamiento Esperado:</strong> ${item.expected}</span>
+                </div>
+              </div>
+
+              <div class="item-notes-box">
+                <input 
+                  type="text" 
+                  class="item-notes-input" 
+                  id="notes-${item.id}" 
+                  placeholder="Observaciones o notas sobre la prueba (ej: 'Probado OK', 'Falla detectada:...')..." 
+                  value="${escapeHtml(itemState.notes || '')}"
+                  oninput="setItemNotes('${item.id}', this.value)"
+                />
+              </div>
+            </div>
+
+            <div style="text-align: right;">
+              <span class="quick-status-tag qs-${itemState.status}" id="tag-${item.id}">
+                ${itemState.status === 'ok' ? 'APROBADO' : (itemState.status === 'fail' ? 'FALLA' : 'PENDIENTE')}
+              </span>
+            </div>
+          `;
+
+          content.appendChild(itemCard);
+        });
+
+        sectionBox.appendChild(header);
+        sectionBox.appendChild(content);
+        wrapper.appendChild(sectionBox);
+      });
+
+      updateStats();
+      applyFilters();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function toggleSection(secId) {
+      const box = document.getElementById(`box-${secId}`);
+      if (box) box.classList.toggle('collapsed');
+    }
+
+    function expandAllSections() {
+      document.querySelectorAll('.section-box').forEach(b => b.classList.remove('collapsed'));
+    }
+
+    function collapseAllSections() {
+      document.querySelectorAll('.section-box').forEach(b => b.classList.add('collapsed'));
+    }
+
+    function setItemStatus(itemId, newStatus) {
+      if (!checklistState[itemId]) checklistState[itemId] = { status: 'pending', notes: '' };
+      checklistState[itemId].status = checklistState[itemId].status === newStatus ? 'pending' : newStatus;
+      checklistState[itemId].updatedAt = new Date().toISOString();
+      updateItemUI(itemId);
+      saveState();
+    }
+
+    function setItemNotes(itemId, notesText) {
+      if (!checklistState[itemId]) checklistState[itemId] = { status: 'pending', notes: '' };
+      checklistState[itemId].notes = notesText;
+      checklistState[itemId].updatedAt = new Date().toISOString();
+      saveState();
+    }
+
+    function updateItemUI(itemId) {
+      const card = document.getElementById(`card-${itemId}`);
+      if (!card) return;
+
+      const state = checklistState[itemId] || { status: 'pending', notes: '' };
+      card.className = `check-item status-${state.status}`;
+      card.setAttribute('data-status', state.status);
+
+      const btnOk = card.querySelector('.btn-ok');
+      const btnFail = card.querySelector('.btn-fail');
+      const tag = document.getElementById(`tag-${itemId}`);
+
+      if (btnOk) btnOk.classList.toggle('active', state.status === 'ok');
+      if (btnFail) btnFail.classList.toggle('active', state.status === 'fail');
+
+      if (tag) {
+        tag.className = `quick-status-tag qs-${state.status}`;
+        tag.textContent = state.status === 'ok' ? 'APROBADO' : (state.status === 'fail' ? 'FALLA' : 'PENDIENTE');
+      }
+    }
+
+    function markSectionOk(secId) {
+      const section = CHECKLIST_DATA.find(s => s.id === secId);
+      if (!section) return;
+
+      section.items.forEach(item => {
+        if (!checklistState[item.id]) checklistState[item.id] = { status: 'pending', notes: '' };
+        checklistState[item.id].status = 'ok';
+        checklistState[item.id].updatedAt = new Date().toISOString();
+        updateItemUI(item.id);
+      });
+
+      saveState();
+    }
+
+    function updateStats() {
+      let total = 0;
+      let okCount = 0;
+      let failCount = 0;
+      let pendingCount = 0;
+
+      CHECKLIST_DATA.forEach(sec => {
+        let secOk = 0;
+        sec.items.forEach(it => {
+          total++;
+          const st = checklistState[it.id]?.status || 'pending';
+          if (st === 'ok') { okCount++; secOk++; }
+          else if (st === 'fail') failCount++;
+          else pendingCount++;
+        });
+
+        const badge = document.getElementById(`badge-${sec.id}`);
+        if (badge) badge.textContent = `${secOk} / ${sec.items.length}`;
+        const box = document.getElementById(`box-${sec.id}`);
+        if (box) box.classList.toggle('completed', secOk === sec.items.length && sec.items.length > 0);
+      });
+
+      document.getElementById('count-total').textContent = total;
+      document.getElementById('count-ok').textContent = okCount;
+      document.getElementById('count-fail').textContent = failCount;
+      document.getElementById('count-pending').textContent = pendingCount;
+
+      document.getElementById('chip-all-count').textContent = total;
+      document.getElementById('chip-ok-count').textContent = okCount;
+      document.getElementById('chip-fail-count').textContent = failCount;
+      document.getElementById('chip-pending-count').textContent = pendingCount;
+
+      const percent = total > 0 ? Math.round((okCount / total) * 100) : 0;
+      document.getElementById('progress-percent').textContent = `${percent}%`;
+      document.getElementById('progress-fill').style.width = `${percent}%`;
+    }
+
+    function setFilter(filterType) {
+      currentFilter = filterType;
+      document.querySelectorAll('.chip').forEach(c => {
+        c.classList.toggle('active', c.getAttribute('data-filter') === filterType);
+      });
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const term = (document.getElementById('search-input').value || '').toLowerCase().trim();
+
+      document.querySelectorAll('.section-box').forEach(secBox => {
+        let visibleInSec = 0;
+        const items = secBox.querySelectorAll('.check-item');
+
+        items.forEach(card => {
+          const status = card.getAttribute('data-status');
+          const severity = card.getAttribute('data-severity');
+          const text = card.textContent.toLowerCase();
+
+          let matchType = false;
+          if (currentFilter === 'all') matchType = true;
+          else if (currentFilter === 'ok' && status === 'ok') matchType = true;
+          else if (currentFilter === 'fail' && status === 'fail') matchType = true;
+          else if (currentFilter === 'pending' && status === 'pending') matchType = true;
+          else if (currentFilter === 'critical' && severity === 'critical') matchType = true;
+
+          const matchSearch = term === '' || text.includes(term);
+
+          if (matchType && matchSearch) {
+            card.style.display = 'grid';
+            visibleInSec++;
+          } else {
+            card.style.display = 'none';
+          }
+        });
+
+        secBox.style.display = visibleInSec > 0 ? 'block' : 'none';
+      });
+    }
+
+    function scrollToNextPending() {
+      const pendingItems = Array.from(document.querySelectorAll('.check-item[data-status="pending"]'));
+      if (pendingItems.length === 0) {
+        alert('🎉 ¡Felicitaciones! No quedan pruebas pendientes.');
+        return;
+      }
+
+      for (let it of pendingItems) {
+        const parentSec = it.closest('.section-box');
+        if (parentSec) parentSec.classList.remove('collapsed');
+        it.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        it.style.transition = 'outline 0.3s ease';
+        it.style.outline = '3px solid #3b82f6';
+        setTimeout(() => it.style.outline = 'none', 1800);
+        break;
+      }
+    }
+
+    function exportReportJSON() {
+      const report = {
+        title: "Reporte de Control de Calidad Simple ProX",
+        version: "1.3.9",
+        exportedAt: new Date().toISOString(),
+        stats: {
+          total: document.getElementById('count-total').textContent,
+          ok: document.getElementById('count-ok').textContent,
+          fail: document.getElementById('count-fail').textContent,
+          pending: document.getElementById('count-pending').textContent,
+          percent: document.getElementById('progress-percent').textContent
+        },
+        items: checklistState
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(report, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `QA_SimpleProX_Checklist_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importReportJSON() {
+      document.getElementById('import-file-input').click();
+    }
+
+    function handleFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && parsed.items) checklistState = parsed.items;
+          else if (typeof parsed === 'object') checklistState = parsed;
+          saveState();
+          renderChecklist();
+          alert('✅ Reporte cargado exitosamente.');
+        } catch (err) {
+          alert('❌ El archivo seleccionado no es un JSON válido.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetAllChecklist() {
+      if (confirm('¿Estás seguro de que deseas reiniciar todos los checks a Pendiente? Se borrarán los estados y notas guardadas.')) {
+        checklistState = {};
+        localStorage.removeItem(STORAGE_KEY);
+        renderChecklist();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      renderChecklist();
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 // src/screens/Clientes.jsx
 import React, { useState } from 'react';
-import { Search, UserPlus, Upload, Download, DollarSign, Users, X, Edit2, Trash2, Filter, MessageCircle } from 'lucide-react';
+import { Search, UserPlus, Upload, Download, DollarSign, Users, X, Edit2, Trash2, Filter, MessageCircle, Receipt } from 'lucide-react';
 
 const formatCur = (num) => `$ ${num.toLocaleString('es-AR')}`;
 
@@ -61,6 +61,9 @@ const Clientes = ({ kiosco }) => {
   const [selectedClientForPayment, setSelectedClientForPayment] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+
+  // Debt detail state
+  const [selectedClientForDetail, setSelectedClientForDetail] = useState(null);
 
   const handleRegisterClient = () => {
     if (!newClientName) return;
@@ -124,6 +127,12 @@ const Clientes = ({ kiosco }) => {
 
   const clientFiadoSales = selectedClientForPayment 
     ? sales.filter(s => s.clientId === selectedClientForPayment.id && s.method === 'Fiado')
+    : [];
+
+  const clientDetailFiadoSales = selectedClientForDetail
+    ? sales
+        .filter(s => (s.clientId === selectedClientForDetail.id || (s.client && selectedClientForDetail.name && s.client.toLowerCase() === selectedClientForDetail.name.toLowerCase())) && s.method === 'Fiado')
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
     : [];
 
   return (
@@ -226,11 +235,37 @@ const Clientes = ({ kiosco }) => {
                         <span style={{ backgroundColor: 'rgba(52, 168, 83, 0.1)', color: 'var(--color-success)', padding: '4px 8px', borderRadius: '4px', fontSize: '13px', fontWeight: 600 }}>Al día</span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: c.deuda > 0 ? 'var(--color-danger)' : 'var(--color-text)' }}>
+                    <td 
+                      style={{ 
+                        textAlign: 'right', 
+                        fontWeight: 600, 
+                        color: c.deuda > 0 ? 'var(--color-danger)' : 'var(--color-text)',
+                        cursor: c.deuda > 0 ? 'pointer' : 'default'
+                      }}
+                      onClick={() => {
+                        if (c.deuda > 0) {
+                          setSelectedClientForDetail(c);
+                          setActiveModal('debtDetail');
+                        }
+                      }}
+                      title={c.deuda > 0 ? "Ver detalle de fiado" : ""}
+                    >
                       {formatCur(c.deuda || 0)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
+                        {/* Ver detalle de fiado — disponible en cada cliente deudor */}
+                        {c.deuda > 0 && (
+                          <button
+                            className="btn-icon"
+                            title="Ver detalle de lo que debe"
+                            onClick={() => { setSelectedClientForDetail(c); setActiveModal('debtDetail'); }}
+                            style={{ padding: '6px', backgroundColor: 'rgba(234, 67, 53, 0.1)', color: 'var(--color-danger)', borderRadius: '6px' }}
+                          >
+                            <Receipt size={15} />
+                          </button>
+                        )}
+
                         {/* WhatsApp */}
                         {c.phone && (
                           <button
@@ -503,6 +538,155 @@ const Clientes = ({ kiosco }) => {
           >
             {caja.isOpen ? 'Registrar Pago' : 'Debes abrir la caja primero'}
           </button>
+        </Modal>
+      )}
+
+      {/* Modal: Detalle de deuda y compras al fiado */}
+      {activeModal === 'debtDetail' && selectedClientForDetail && (
+        <Modal 
+          title="Detalle de Deuda y Compras al Fiado" 
+          onClose={() => { setActiveModal(null); setSelectedClientForDetail(null); }}
+        >
+          <div style={{ marginBottom: '16px', backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div>
+                <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Cliente: </span>
+                <strong style={{ fontSize: '16px', color: '#1a1f36' }}>{selectedClientForDetail.name}</strong>
+              </div>
+              {selectedClientForDetail.cuit && (
+                <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  CUIT/DNI: <strong>{selectedClientForDetail.cuit}</strong>
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px dashed var(--color-border)' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Deuda Total Activa:</div>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-danger)' }}>
+                  {formatCur(selectedClientForDetail.deuda || 0)}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '12px', backgroundColor: 'rgba(234, 67, 53, 0.1)', color: 'var(--color-danger)', padding: '4px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                  {clientDetailFiadoSales.length} {clientDetailFiadoSales.length === 1 ? 'ticket fiado registrado' : 'tickets fiados registrados'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 700, color: '#1a1f36', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Receipt size={15} /> Historial de Compras al Fiado
+            </h4>
+            
+            {clientDetailFiadoSales.length === 0 ? (
+              <div style={{ padding: '24px', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '1px dashed var(--color-border)', textAlign: 'center' }}>
+                <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: '#1a1f36' }}>No hay registros detallados de tickets al fiado</p>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  La deuda de {formatCur(selectedClientForDetail.deuda)} se encuentra asentada en la cuenta corriente del cliente.
+                </p>
+              </div>
+            ) : (
+              <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
+                {clientDetailFiadoSales.map(sale => {
+                  const saleDate = new Date(sale.date);
+                  const formattedDate = saleDate.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                  const formattedTime = saleDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+                  return (
+                    <div 
+                      key={sale.id} 
+                      style={{ 
+                        backgroundColor: '#fff', 
+                        border: '1px solid var(--color-border)', 
+                        borderRadius: '10px', 
+                        padding: '14px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                      }}
+                    >
+                      {/* Cabecera del ticket fiado con fecha, hora y total */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid #f1f3f5' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: '#1a1f36' }}>
+                            📅 {formattedDate} — ⏰ {formattedTime} hs
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                            Ticket Nº {sale.id} {sale.sellerName ? `• Atendió: ${sale.sellerName}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Total Ticket</div>
+                          <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-danger)' }}>
+                            {formatCur(sale.total)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Desglose de productos comprados */}
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ color: 'var(--color-text-muted)', borderBottom: '1px dashed var(--color-border)', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase' }}>
+                            <th style={{ padding: '4px 6px' }}>Cant.</th>
+                            <th style={{ padding: '4px 6px' }}>Producto</th>
+                            <th style={{ padding: '4px 6px', textAlign: 'right' }}>Precio Unit.</th>
+                            <th style={{ padding: '4px 6px', textAlign: 'right' }}>Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(sale.items && sale.items.length > 0) ? (
+                            sale.items.map((it, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #f9fafb' }}>
+                                <td style={{ padding: '6px', fontWeight: 700, color: 'var(--color-primary)', width: '50px' }}>
+                                  {it.qty}x
+                                </td>
+                                <td style={{ padding: '6px', fontWeight: 500, color: '#1a1f36' }}>
+                                  {it.name}
+                                </td>
+                                <td style={{ padding: '6px', textAlign: 'right', color: 'var(--color-text-muted)', width: '90px' }}>
+                                  {formatCur(it.price || 0)}
+                                </td>
+                                <td style={{ padding: '6px', textAlign: 'right', fontWeight: 600, width: '100px' }}>
+                                  {formatCur(it.lineTotal || ((it.price || 0) * (it.qty || 1)))}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="4" style={{ padding: '8px', textAlign: 'center', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                Sin detalle de productos
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
+            <button 
+              className="btn btn-outline" 
+              onClick={() => { setActiveModal(null); setSelectedClientForDetail(null); }}
+            >
+              Cerrar
+            </button>
+            {isPro && (
+              <button 
+                className="btn btn-primary"
+                onClick={() => {
+                  const client = selectedClientForDetail;
+                  setActiveModal('payDebt');
+                  setSelectedClientForPayment(client);
+                  setSelectedClientForDetail(null);
+                }}
+              >
+                <DollarSign size={15} /> Registrar Cobro / Saldar
+              </button>
+            )}
+          </div>
         </Modal>
       )}
 

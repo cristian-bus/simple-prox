@@ -124,7 +124,7 @@ export async function sendTelegramNotification(installationData) {
     lastSentTime = now;
 
     const message = `
-🚨 <b>¡NUEVA INSTALACIÓN DE KIOSCO PROX!</b> 🚨
+🚨 <b>¡NUEVA INSTALACIÓN DE SIMPLE PROX!</b> 🚨
 ---------------------------------------------
 🏪 <b>Negocio:</b> ${negocio}
 📍 <b>Dirección:</b> ${direccion}
@@ -172,7 +172,7 @@ export async function testTelegramNotification(customToken, customChatId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: '🧪 <b>Prueba de Notificación de KioscoProX</b>\n\n¡Tu Bot de Telegram está funcionando correctamente! 🎉\n\n💡 <b>Control Remoto de Clave:</b> Puedes cambiar la Clave Maestra en cualquier momento enviando a este chat el comando:\n<code>/clave TuNuevaClave</code>',
+        text: '🧪 <b>Prueba de Notificación de Simple ProX</b>\n\n¡Tu Bot de Telegram está funcionando correctamente! 🎉\n\n💡 <b>Control Remoto de Clave:</b> Puedes cambiar la Clave Maestra en cualquier momento enviando a este chat el comando:\n<code>/clave TuNuevaClave</code>',
         parse_mode: 'HTML'
       })
     });
