@@ -2047,12 +2047,21 @@
           const { data } = await supabaseClient.auth.getSession();
           if (data && data.session) {
             authSession = data.session;
+          } else {
+            authSession = null;
           }
-        } catch(e) {}
+        } catch(e) {
+          authSession = null;
+        }
       }
       const authOverlay = document.getElementById('auth-overlay');
-      if (authOverlay) authOverlay.style.display = 'none';
-      initApp();
+      if (authSession && authSession.user) {
+        if (authOverlay) authOverlay.style.display = 'none';
+        initApp();
+      } else {
+        authSession = null;
+        if (authOverlay) authOverlay.style.display = 'flex';
+      }
     }
 
     async function handleLogin() {
@@ -2078,10 +2087,13 @@
 
     async function handleLogout() {
       if (supabaseClient) {
-        await supabaseClient.auth.signOut();
-        authSession = null;
-        document.getElementById('auth-overlay').style.display = 'flex';
+        try {
+          await supabaseClient.auth.signOut();
+        } catch(e) {}
       }
+      authSession = null;
+      const authOverlay = document.getElementById('auth-overlay');
+      if (authOverlay) authOverlay.style.display = 'flex';
     }
 
     // Wrap initialization

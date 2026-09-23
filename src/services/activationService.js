@@ -4,9 +4,9 @@ import { APP_VERSION } from '../constants/version.js';
 
 const DEFAULT_CONFIG = {
   remoteConfigUrl: '',
-  telegramBotToken: '8929069889:AAEGeygVdVXdp-V1llq3UrcksgIVVEQytpE', // Token preconfigurado
-  telegramChatId: '1103915546',   // ID del chat del dueño preconfigurado
-  defaultMasterKey: 'SiMple2026' // Clave maestra por defecto
+  telegramBotToken: '',
+  telegramChatId: '',
+  defaultMasterKey: ''
 };
 
 let lastSentInstallationKey = '';
@@ -42,47 +42,8 @@ export async function getIpGeoInfo() {
 
 export async function fetchRemoteMasterKey() {
   const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-  const botToken = config.telegramBotToken || DEFAULT_CONFIG.telegramBotToken;
-  const chatId = config.telegramChatId || DEFAULT_CONFIG.telegramChatId;
 
-  // 1. Consultar Telegram con timeout de 2.5s para no demorar la activación
-  if (botToken && chatId) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
-      const url = `https://api.telegram.org/bot${botToken}/getUpdates?allowed_updates=["message"]`;
-      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
-          
-          // Limpiar la cola de Telegram para que no devuelva mensajes viejos
-          const highestUpdateId = Math.max(...data.result.map(u => u.update_id));
-          fetch(`https://api.telegram.org/bot${botToken}/getUpdates?offset=${highestUpdateId + 1}`).catch(() => {});
-
-          // Filtrar mensajes del dueño que empiecen con /clave
-          const claveMessages = data.result
-            .filter(item => item.message && String(item.message.chat?.id) === String(chatId) && item.message.text)
-            .map(item => item.message.text.trim())
-            .filter(text => text.toLowerCase().startsWith('/clave'));
-
-          if (claveMessages.length > 0) {
-            const lastCommand = claveMessages[claveMessages.length - 1];
-            const parts = lastCommand.split(/\s+/);
-            if (parts.length >= 2 && parts[1].trim()) {
-              return parts.slice(1).join(' ').trim();
-            }
-          }
-        }
-      }
-    } catch (err) {
-      // Timeout o error de red: continuar inmediatamente sin bloquear
-    }
-  }
-
-  // 2. Si hay una URL de API Nube alternativa
+  // 1. Si hay una URL de API Nube configurada
   if (config.remoteConfigUrl) {
     try {
       const c3 = new AbortController();
@@ -97,8 +58,8 @@ export async function fetchRemoteMasterKey() {
     } catch (err) {}
   }
 
-  // 3. Clave maestra configurada localmente o por defecto
-  return config.masterKey || DEFAULT_CONFIG.defaultMasterKey;
+  // 2. Clave maestra configurada localmente en la terminal
+  return (config.masterKey || '').trim();
 }
 
 export async function sendTelegramNotification(installationData) {
@@ -196,7 +157,8 @@ export async function testTelegramNotification(customToken, customChatId) {
 export async function processActivation({ negocio, direccion, telefono, instalador, masterKeyInput, version = APP_VERSION }) {
   const remoteMasterKey = await fetchRemoteMasterKey();
 
-  if (masterKeyInput.trim() !== remoteMasterKey) {
+  // Si existe una clave maestra configurada remotamente o en terminal, validarla
+  if (remoteMasterKey && masterKeyInput.trim() !== remoteMasterKey) {
     return { success: false, error: 'La Clave Maestra ingresada es incorrecta o fue cambiada.' };
   }
 

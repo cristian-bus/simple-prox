@@ -35,7 +35,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
   });
   const [localMasterKey, setLocalMasterKey] = useState(() => {
     const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.masterKey || 'ProX2026MasterKey';
+    return config.masterKey || '';
   });
 
   const handleTestTelegram = async () => {

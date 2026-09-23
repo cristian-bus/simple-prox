@@ -76,14 +76,30 @@ function createWindow() {
     }
   });
 
-  // Interceptar TODAS las aperturas de ventanas (window.open, target="_blank", enlaces de WhatsApp)
-  // y abrirlas en el navegador predeterminado del sistema
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('whatsapp:') || url.startsWith('mailto:'))) {
-      shell.openExternal(url).catch(err => console.error('[Main] Error abriendo external URL con setWindowOpenHandler:', err));
-      return { action: 'deny' };
+// Validación defensiva estricta de URLs externas (Deny-by-Default)
+function isSafeExternalUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  try {
+    const parsed = new URL(rawUrl);
+    // Permitir solo protocolos web seguros y correo
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'mailto:') {
+      return true;
     }
-    return { action: 'allow' };
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+  // Interceptar TODAS las aperturas de ventanas (window.open, target="_blank", enlaces de WhatsApp)
+  // Deny-by-default: las URLs válidas se abren en navegador externo y nunca se permite crear ventanas hijas arbitrarias
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url).catch(err => console.error('[Main] Error abriendo external URL con setWindowOpenHandler:', err));
+    } else {
+      console.warn('[Main] Apertura bloqueada por política de seguridad (URL no segura):', url);
+    }
+    return { action: 'deny' };
   });
 
   win.once('ready-to-show', () => {
@@ -152,8 +168,10 @@ function createWindow() {
   });
 
   ipcMain.on('open-external', (event, url) => {
-    if (url && typeof url === 'string') {
+    if (isSafeExternalUrl(url)) {
       shell.openExternal(url).catch(err => console.error('[Main] Error abriendo external URL:', err));
+    } else {
+      console.warn('[Main] Intento bloqueado por política de seguridad en open-external:', url);
     }
   });
 }
