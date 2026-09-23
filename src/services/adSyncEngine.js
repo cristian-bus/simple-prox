@@ -1,6 +1,6 @@
-// Motor de Sincronización, Caché y Métricas Offline para Ofertas B2B (KioscoProX / Simple ProX)
 import { generateWhatsAppMessage, calculateDiscount, extractB2BMetadata, getCampaignStatus, generateCampaignCode } from '../utils/b2bUtils.js';
 import { enqueueOutbox, flushOutbox } from './syncService.js';
+import { sendTerminalRegister, sendTerminalEvents } from './terminalIdentityService.js';
 import { APP_VERSION } from '../constants/version.js';
 
 const CACHE_KEYS = {
@@ -307,47 +307,8 @@ export async function registerMerchantRemotely(merchantInfo = {}) {
   }
 
   try {
-    const baseUrl = supabaseUrl.replace(/\/$/, '');
-    const mEndpoint = baseUrl.includes('/rest/v1') 
-      ? `${baseUrl}/merchants?on_conflict=id` 
-      : `${baseUrl}/rest/v1/merchants?on_conflict=id`;
-
-    const merchantData = {
-      id: mId,
-      installation_id: mId,
-      commerce_id: completeMerchantInfo.commerceId,
-      name: mName,
-      plan: mPlan,
-      app_version: mAppVersion,
-      last_active: new Date().toISOString(),
-      last_seen_at: new Date().toISOString()
-    };
-
-    if (completeMerchantInfo.provinceCode) merchantData.province_code = completeMerchantInfo.provinceCode;
-    if (completeMerchantInfo.provinceName) merchantData.province_name = completeMerchantInfo.provinceName;
-    if (completeMerchantInfo.cityCode) merchantData.city_code = completeMerchantInfo.cityCode;
-    if (completeMerchantInfo.cityName) {
-      merchantData.city_name = completeMerchantInfo.cityName;
-      merchantData.city = completeMerchantInfo.cityName;
-    }
-    if (mAddress && mAddress.trim()) merchantData.address = mAddress.trim();
-    if (mPhone && mPhone.trim()) merchantData.phone = mPhone.trim();
-    if (mInstaller && mInstaller.trim()) merchantData.installer = mInstaller.trim();
-    if (mIp && mIp.trim()) merchantData.ip = mIp.trim();
-    if (completeMerchantInfo.businessType) merchantData.business_type = completeMerchantInfo.businessType;
-
-    const res = await fetch(mEndpoint, {
-      method: 'POST',
-      headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify(merchantData)
-    });
-
-    if (res.ok || res.status === 201 || res.status === 204) {
+    const res = await sendTerminalRegister(completeMerchantInfo);
+    if (res.success) {
       try {
         localStorage.removeItem(CACHE_KEYS.PENDING_MERCHANT_SYNC);
       } catch(e) {}
@@ -440,50 +401,30 @@ export async function flushPendingEvents(merchantId) {
 
     if (events.length === 0) return;
 
-    // Enviar a Supabase REST API si está configurado
-    if (supabaseUrl && supabaseKey) {
-      try {
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
-        const endpoint = baseUrl.includes('/rest/v1') 
-          ? `${baseUrl}/campaign_events`
-          : `${baseUrl}/rest/v1/campaign_events`;
+    // Enviar a través del Endpoint Seguro de Terminal
+    try {
+      const payload = events.map(evt => ({
+        eventId: evt.eventId,
+        campaignId: evt.campaignId,
+        eventType: evt.eventType,
+        timestamp: evt.timestamp
+      }));
 
-        const payload = events.map(evt => ({
-          event_id: evt.eventId,
-          merchant_id: evt.merchantId || merchantId || 'PC-ANONIMO',
-          campaign_id: evt.campaignId,
-          event_type: evt.eventType,
-          timestamp: evt.timestamp
-        }));
+      const response = await sendTerminalEvents(payload);
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (response.ok || response.status === 201 || response.status === 409) {
-          try {
-            const currentRaw = localStorage.getItem(CACHE_KEYS.PENDING_EVENTS);
-            const currentEvents = currentRaw ? JSON.parse(currentRaw) : [];
-            const syncedEventIds = new Set(events.map(e => e.eventId));
-            const remainingEvents = currentEvents.filter(e => !syncedEventIds.has(e.eventId));
-            localStorage.setItem(CACHE_KEYS.PENDING_EVENTS, JSON.stringify(remainingEvents));
-          } catch(e) {}
-        } else {
-          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-            localStorage.setItem(CACHE_KEYS.PENDING_EVENTS, JSON.stringify([]));
-          }
-        }
-      } catch (err) {
-        console.warn('[AdSyncEngine] Error al sincronizar métricas con Supabase:', err);
+      if (response.success) {
+        try {
+          const currentRaw = localStorage.getItem(CACHE_KEYS.PENDING_EVENTS);
+          const currentEvents = currentRaw ? JSON.parse(currentRaw) : [];
+          const syncedEventIds = new Set(events.map(e => e.eventId));
+          const remainingEvents = currentEvents.filter(e => !syncedEventIds.has(e.eventId));
+          localStorage.setItem(CACHE_KEYS.PENDING_EVENTS, JSON.stringify(remainingEvents));
+        } catch(e) {}
       }
+    } catch (err) {
+      console.warn('[AdSyncEngine] Error al sincronizar métricas con Edge Function:', err);
     }
+
   } finally {
     isFlushing = false;
   }

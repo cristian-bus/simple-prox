@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('api', {
   confirmClose: () => {
     ipcRenderer.send('confirm-close');
   },
+  // Almacenamiento seguro DPAPI
+  secureStoreEncrypt: (plainText) => ipcRenderer.invoke('secure-store-encrypt', plainText),
+  secureStoreDecrypt: (encryptedHex) => ipcRenderer.invoke('secure-store-decrypt', encryptedHex),
   getAppVersion: () => {
     return ipcRenderer.invoke('get-app-version');
   },

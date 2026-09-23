@@ -6,6 +6,7 @@ import { isOnline, subscribeConnectivity, checkRealConnectivity } from './connec
 import { getCommerceProfile } from './installationService.js';
 import { getAdConfig } from './adSyncEngine.js';
 import { APP_VERSION } from '../constants/version.js';
+import { sendTerminalEvents, sendTerminalHeartbeat, sendTerminalRegister } from './terminalIdentityService.js';
 
 const STORAGE_KEYS = {
   OUTBOX: 'kioscoprox_outbox',
@@ -121,33 +122,21 @@ export async function flushOutbox() {
       }
     }
 
-    // 1. Despachar Lote de Métricas de Campañas
+    // 1. Despachar Lote de Métricas de Campañas vía Endpoint Seguro de Terminal
     if (campaignEvents.length > 0) {
       try {
-        const batchEndpoint = `${supabaseUrl}/rest/v1/campaign_events`;
-        const payload = campaignEvents.map(it => ({
-          event_id: it.payload.eventId || it.id,
-          merchant_id: it.payload.merchantId || it.payload.installationId,
-          campaign_id: it.payload.campaignId,
-          event_type: it.payload.eventType,
+        const eventsPayload = campaignEvents.map(it => ({
+          eventId: it.payload.eventId || it.id,
+          campaignId: it.payload.campaignId,
+          eventType: it.payload.eventType,
           timestamp: it.payload.timestamp || it.createdAt
         }));
 
-        const res = await fetch(batchEndpoint, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(payload)
-        });
+        const result = await sendTerminalEvents(eventsPayload);
 
-        if (res.ok || res.status === 201 || res.status === 409) {
-          // Exitoso o colisión idempotente: no conservar en la cola
-        } else {
-          // Si falló por error de red o 5xx, conservar para reintento con backoff
+        if (result.success) {
+          // Exitoso o procesado por el backend seguro
+        } else if (result.retryable) {
           campaignEvents.forEach(it => {
             it.attempts += 1;
             it.lastAttempt = new Date().toISOString();
@@ -163,59 +152,38 @@ export async function flushOutbox() {
       }
     }
 
-    // 2. Despachar Operaciones Individuales (Registro de Comercio, Heartbeat)
+    // 2. Despachar Operaciones Individuales vía Endpoint Seguro de Terminal (Heartbeat, Registro)
     for (const item of otherOperations) {
       try {
-        if (item.type === 'MERCHANT_REGISTER' || item.type === 'HEARTBEAT') {
-          const mEndpoint = `${supabaseUrl}/rest/v1/merchants?on_conflict=id`;
-          const mData = {
-            id: item.payload.installationId,
-            installation_id: item.payload.installationId,
-            commerce_id: item.payload.commerceId,
-            name: item.payload.storeName || item.payload.name,
-            plan: item.payload.plan || 'Básico',
-            province_code: item.payload.provinceCode,
-            province_name: item.payload.provinceName,
-            city_code: item.payload.cityCode,
-            city_name: item.payload.cityName || item.payload.city,
-            city: item.payload.cityName || item.payload.city,
+        let result = { success: false, retryable: true };
+
+        if (item.type === 'HEARTBEAT') {
+          result = await sendTerminalHeartbeat({
+            appVersion: APP_VERSION,
+            configVersion: item.payload.configVersion || '1.0.0',
+            status: item.payload.status || 'active',
+            lastSeenAt: new Date().toISOString()
+          });
+        } else if (item.type === 'MERCHANT_REGISTER') {
+          result = await sendTerminalRegister({
+            storeName: item.payload.storeName || item.payload.name,
             address: item.payload.address,
             phone: item.payload.phone,
             installer: item.payload.installer,
-            business_type: item.payload.businessType,
-            app_version: APP_VERSION,
-            status: item.payload.status || 'active',
-            last_active: new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
-            config_version: item.payload.configVersion || '1.0.0'
-          };
-
-          // Limpieza de nulos innecesarios
-          Object.keys(mData).forEach(k => {
-            if (mData[k] === undefined || mData[k] === null || mData[k] === '') {
-              delete mData[k];
-            }
+            businessType: item.payload.businessType,
+            provinceCode: item.payload.provinceCode,
+            provinceName: item.payload.provinceName,
+            cityCode: item.payload.cityCode,
+            cityName: item.payload.cityName || item.payload.city,
+            commerceId: item.payload.commerceId,
+            appVersion: APP_VERSION
           });
-          // Mantener id obligatorio
-          mData.id = item.payload.installationId;
-          mData.installation_id = item.payload.installationId;
+        }
 
-          const res = await fetch(mEndpoint, {
-            method: 'POST',
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify(mData)
-          });
-
-          if (!res.ok && res.status !== 201 && res.status !== 204) {
-            item.attempts += 1;
-            item.lastAttempt = new Date().toISOString();
-            if (item.attempts < MAX_RETRIES) remaining.push(item);
-          }
+        if (!result.success && result.retryable) {
+          item.attempts += 1;
+          item.lastAttempt = new Date().toISOString();
+          if (item.attempts < MAX_RETRIES) remaining.push(item);
         }
       } catch (err) {
         item.attempts += 1;

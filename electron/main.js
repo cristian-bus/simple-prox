@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, safeStorage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import electronUpdater from 'electron-updater';
@@ -137,6 +137,31 @@ function isSafeExternalUrl(rawUrl) {
 
   ipcMain.handle('get-app-version', () => {
     return app.getVersion();
+  });
+
+  ipcMain.handle('secure-store-encrypt', async (event, plainText) => {
+    try {
+      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+        const buffer = safeStorage.encryptString(plainText);
+        return { success: true, encrypted: buffer.toString('hex') };
+      }
+    } catch (e) {
+      console.warn('[SafeStorage] Error cifrando:', e);
+    }
+    return { success: false };
+  });
+
+  ipcMain.handle('secure-store-decrypt', async (event, encryptedHex) => {
+    try {
+      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+        const buffer = Buffer.from(encryptedHex, 'hex');
+        const decrypted = safeStorage.decryptString(buffer);
+        return { success: true, decrypted };
+      }
+    } catch (e) {
+      console.warn('[SafeStorage] Error descifrando:', e);
+    }
+    return { success: false };
   });
 
   ipcMain.on('check-for-updates', () => {
