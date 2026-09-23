@@ -31,23 +31,91 @@ Deno.serve(async (req: Request) => {
   const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // -------------------------------------------------------------
-    // RUTA: /enroll (Enrolamiento de Terminal y Emisión de Token)
-    // -------------------------------------------------------------
-    if (action === "enroll" && req.method === "POST") {
-      const body = await req.json();
-      const installationId = String(body.installationId || "").trim();
+    // -------------------------------------------------------------------------
+    // RUTA: /issue-ticket (Emisión de Enrollment Ticket - Requiere Sesión Admin)
+    // -------------------------------------------------------------------------
+    if (action === "issue-ticket" && req.method === "POST") {
+      const authHeader = req.headers.get("authorization") || "";
+      const jwt = authHeader.replace(/^Bearer\s+/i, "");
+      
+      const { data: { user }, error: userError } = await adminClient.auth.getUser(jwt);
+      if (userError || !user) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "No autorizado: se requiere sesión administrativa para emitir tickets de enrolamiento" 
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const targetInstallationId = String(body.installationId || "").trim();
       const commerceId = String(body.commerceId || "").trim();
       const storeName = String(body.storeName || "").trim();
 
-      if (!installationId || installationId.length < 3) {
+      if (!targetInstallationId || targetInstallationId.length < 3) {
         return new Response(JSON.stringify({ success: false, error: "installationId inválido" }), {
           status: 400,
           headers: corsHeaders
         });
       }
 
-      // 1. Verificar si la terminal ya fue enrolada previamente
+      // Generar ticket criptográfico de 256 bits de un solo uso
+      const rawTicket = "spx_ticket_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+      const ticketHash = await sha256Hex(rawTicket);
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 horas
+
+      const { error: insertTicketError } = await adminClient
+        .from("terminal_enrollment_tickets")
+        .insert({
+          ticket_hash: ticketHash,
+          installation_id: targetInstallationId,
+          commerce_id: commerceId || null,
+          store_name: storeName || null,
+          expires_at: expiresAt,
+          status: "pending",
+          created_by: user.email || user.id
+        });
+
+      if (insertTicketError) {
+        return new Response(JSON.stringify({ success: false, error: "Error al registrar ticket de enrolamiento" }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        enrollmentTicket: rawTicket,
+        installationId: targetInstallationId,
+        expiresAt
+      }), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // RUTA: /enroll (Enrolamiento Seguro: Consumo Atómico de Enrollment Ticket)
+    // -------------------------------------------------------------------------
+    if (action === "enroll" && req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const installationId = String(body.installationId || "").trim();
+      const enrollmentTicket = String(body.enrollmentTicket || "").trim();
+
+      // REGLA CRÍTICA: installationId no es secreto; exige obligatoriamente enrollmentTicket
+      if (!installationId || !enrollmentTicket) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "Autenticación requerida: se requiere installationId y enrollmentTicket válido para enrolar" 
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 1. Verificar si la terminal ya fue enrolada previamente y está activa
       const { data: existingIdentity } = await adminClient
         .from("terminal_identities")
         .select("installation_id, status")
@@ -64,19 +132,47 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // 2. Generar token de terminal criptográfico de alta entropía (256 bits)
+      // 2. Consumo Atómico del Ticket:
+      // Solo tiene éxito si coincide el ticket_hash, installation_id, status = 'pending' y no ha expirado
+      const ticketHash = await sha256Hex(enrollmentTicket);
+      const nowIso = new Date().toISOString();
+
+      const { data: consumedTicket, error: ticketError } = await adminClient
+        .from("terminal_enrollment_tickets")
+        .update({
+          status: "used",
+          used_at: nowIso
+        })
+        .eq("ticket_hash", ticketHash)
+        .eq("installation_id", installationId)
+        .eq("status", "pending")
+        .gt("expires_at", nowIso)
+        .select("installation_id, commerce_id, store_name")
+        .maybeSingle();
+
+      if (ticketError || !consumedTicket) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "Ticket de enrolamiento inválido, expirado, ya utilizado o no asignado a esta terminal." 
+        }), {
+          status: 403,
+          headers: corsHeaders
+        });
+      }
+
+      // 3. Generar token de terminal criptográfico de alta entropía (256 bits)
       const rawToken = "spx_term_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
       const tokenHash = await sha256Hex(rawToken);
 
-      // 3. Registrar en terminal_identities
+      // 4. Registrar en terminal_identities
       const { error: idError } = await adminClient
         .from("terminal_identities")
         .upsert({
           installation_id: installationId,
           token_hash: tokenHash,
-          commerce_id: commerceId || null,
+          commerce_id: consumedTicket.commerce_id || body.commerceId || null,
           status: "active",
-          last_used_at: new Date().toISOString()
+          last_used_at: nowIso
         });
 
       if (idError) {
@@ -86,7 +182,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // 4. Si el comercio no existe en merchants, crearlo
+      // 5. Vincular/crear en merchants ÚNICAMENTE con los datos autorizados del ticket
       const { data: existingMerchant } = await adminClient
         .from("merchants")
         .select("id")
@@ -97,13 +193,13 @@ Deno.serve(async (req: Request) => {
         await adminClient.from("merchants").insert({
           id: installationId,
           installation_id: installationId,
-          commerce_id: commerceId || ("COMM-" + installationId),
-          name: storeName || `Kiosco ${installationId}`,
+          commerce_id: consumedTicket.commerce_id || body.commerceId || ("COMM-" + installationId),
+          name: consumedTicket.store_name || body.storeName || `Kiosco ${installationId}`,
           plan: "Básico",
           status: "active",
-          registered_at: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
-          last_active: new Date().toISOString()
+          registered_at: nowIso,
+          last_seen_at: nowIso,
+          last_active: nowIso
         });
       }
 
@@ -117,9 +213,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // -------------------------------------------------------------
-    // AUTENTICACIÓN PARA TODAS LAS DEMÁS RUTAS
-    // -------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // AUTENTICACIÓN GENERAL PARA RUTAS OPERATIVAS (Heartbeat, Register, Events)
+    // -------------------------------------------------------------------------
     const termId = req.headers.get("x-terminal-id")?.trim();
     const termToken = req.headers.get("x-terminal-token")?.trim();
 
@@ -153,9 +249,9 @@ Deno.serve(async (req: Request) => {
       .eq("installation_id", termId)
       .then(() => {});
 
-    // -------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // RUTA: /heartbeat (Telemetría Técnica con Allowlist Estricta)
-    // -------------------------------------------------------------
+    // -------------------------------------------------------------------------
     if (action === "heartbeat" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       
@@ -179,9 +275,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // -------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // RUTA: /register (Registro / Perfil del Comercio Autenticado)
-    // -------------------------------------------------------------
+    // -------------------------------------------------------------------------
     if (action === "register" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
 
@@ -226,9 +322,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // -------------------------------------------------------------
-    // RUTA: /events (Lote de Métricas de Campañas - Vinculación Forzada)
-    // -------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // RUTA: /events (Lote de Métricas - Vinculación Forzada y Validación de Campañas)
+    // -------------------------------------------------------------------------
     if (action === "events" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       const rawEvents = Array.isArray(body.events) ? body.events : (Array.isArray(body) ? body : []);
@@ -241,19 +337,38 @@ Deno.serve(async (req: Request) => {
       }
 
       const validTypes = new Set(["impression", "offer_open", "whatsapp_click"]);
-      const sanitizedEvents = [];
+      let sanitizedEvents = [];
 
       for (const ev of rawEvents.slice(0, 50)) { // Límite de 50 eventos por lote
         const eventType = String(ev.eventType || ev.event_type || "");
         if (!validTypes.has(eventType)) continue;
 
+        const campaignId = ev.campaignId || ev.campaign_id || null;
+
         sanitizedEvents.push({
           event_id: String(ev.eventId || ev.event_id || `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
           merchant_id: termId, // FORZADO a la terminal autenticada (Imposible suplantar otro comercio)
-          campaign_id: ev.campaignId || ev.campaign_id || null,
+          campaign_id: campaignId,
           event_type: eventType,
           timestamp: ev.timestamp || new Date().toISOString(),
           synced_at: new Date().toISOString()
+        });
+      }
+
+      // Validación batch eficiente: validar existencia de campaign_id en 1 sola consulta
+      const uniqueCampaignIds = [...new Set(sanitizedEvents.map(e => e.campaign_id).filter(Boolean))];
+      if (uniqueCampaignIds.length > 0) {
+        const { data: existingCampaigns } = await adminClient
+          .from("campaigns")
+          .select("id")
+          .in("id", uniqueCampaignIds);
+
+        const existingSet = new Set((existingCampaigns || []).map((c: { id: string }) => c.id));
+        sanitizedEvents = sanitizedEvents.map(e => {
+          if (e.campaign_id && !existingSet.has(e.campaign_id)) {
+            return { ...e, campaign_id: null };
+          }
+          return e;
         });
       }
 

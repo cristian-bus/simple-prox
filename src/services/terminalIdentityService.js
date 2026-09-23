@@ -130,10 +130,9 @@ export async function sendTerminalHeartbeat(payload = {}) {
   }
 
   if (res.status === 401) {
-    // Token inválido o revocado: limpiar para permitir re-enrolamiento si corresponde
-    localStorage.removeItem(STORAGE_KEYS.TOKEN_ENC);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN_RAW);
-    return { success: false, retryable: false, error: 'Credencial inválida' };
+    // Seguridad: NO borrar el token local automáticamente ante 401 para evitar caer en limbo 409 (Fase 0.2.1)
+    console.warn('[TerminalIdentity] HTTP 401: Credencial no autorizada o pendiente de activación.');
+    return { success: false, retryable: false, error: 'Credencial no autorizada' };
   }
 
   return { success: false, retryable: res.status >= 500 || res.status === 429 };
@@ -165,9 +164,8 @@ export async function sendTerminalRegister(payload = {}) {
   }
 
   if (res.status === 401) {
-    localStorage.removeItem(STORAGE_KEYS.TOKEN_ENC);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN_RAW);
-    return { success: false, retryable: false, error: 'Credencial inválida' };
+    console.warn('[TerminalIdentity] HTTP 401: Credencial no autorizada al registrar comercio.');
+    return { success: false, retryable: false, error: 'Credencial no autorizada' };
   }
 
   return { success: false, retryable: res.status >= 500 || res.status === 429 };
@@ -204,9 +202,8 @@ export async function sendTerminalEvents(events = []) {
   }
 
   if (res.status === 401) {
-    localStorage.removeItem(STORAGE_KEYS.TOKEN_ENC);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN_RAW);
-    return { success: false, retryable: false, error: 'Credencial inválida' };
+    console.warn('[TerminalIdentity] HTTP 401: Credencial no autorizada al enviar eventos.');
+    return { success: false, retryable: false, error: 'Credencial no autorizada' };
   }
 
   return { success: false, retryable: res.status >= 500 || res.status === 429 };
