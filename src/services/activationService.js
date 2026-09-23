@@ -4,9 +4,7 @@ import { APP_VERSION } from '../constants/version.js';
 
 const DEFAULT_CONFIG = {
   remoteConfigUrl: '',
-  telegramBotToken: '',
-  telegramChatId: '',
-  defaultMasterKey: ''
+  masterKey: ''
 };
 
 let lastSentInstallationKey = '';
@@ -62,103 +60,32 @@ export async function fetchRemoteMasterKey() {
   return (config.masterKey || '').trim();
 }
 
-export async function sendTelegramNotification(installationData) {
-  try {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    const botToken = config.telegramBotToken || DEFAULT_CONFIG.telegramBotToken;
-    const chatId = config.telegramChatId || DEFAULT_CONFIG.telegramChatId;
-
-    if (!botToken || !chatId) {
-      return false;
-    }
-
-    const { negocio, direccion, telefono, instalador, hardwareId, geo, date, version } = installationData;
-
-    // DEDUPLICACIÓN ESTRICTA: Evita enviar dos activaciones idénticas si se dispara más de una vez en 20 segundos
-    const dedupeKey = `${hardwareId}_${negocio}`;
-    const now = Date.now();
-    if (dedupeKey === lastSentInstallationKey && (now - lastSentTime) < 20000) {
-      console.warn('[Telegram] Notificación duplicada prevenida para:', dedupeKey);
-      return true;
-    }
-    lastSentInstallationKey = dedupeKey;
-    lastSentTime = now;
-
-    const message = `
-🚨 <b>¡NUEVA INSTALACIÓN DE SIMPLE PROX!</b> 🚨
----------------------------------------------
-🏪 <b>Negocio:</b> ${negocio}
-📍 <b>Dirección:</b> ${direccion}
-📞 <b>Teléfono:</b> ${telefono || 'No especificado'}
-👤 <b>Instalado por:</b> ${instalador}
-💻 <b>ID Equipo:</b> <code>${hardwareId}</code>
-🌐 <b>IP / Ubicación:</b> ${geo.ip} (${geo.city || ''}, ${geo.region || ''} ${geo.country || ''})
-📅 <b>Fecha y Hora:</b> ${date}
-📦 <b>Versión:</b> v${version}
----------------------------------------------
-✅ <i>Instalación verificada y activada con éxito.</i>
-    `.trim();
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML'
-      })
-    });
-
-    return response.ok;
-  } catch (error) {
-    console.error('Error al enviar notificación de Telegram:', error);
-    return false;
-  }
+export async function sendTelegramNotification(_installationData) {
+  // Notificación directa desde cliente deshabilitada por seguridad (Fase 0.1).
+  // La notificación a Telegram debe realizarse exclusivamente vía backend/Edge Function.
+  return false;
 }
 
-export async function testTelegramNotification(customToken, customChatId) {
-  const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-  const botToken = customToken || config.telegramBotToken || DEFAULT_CONFIG.telegramBotToken;
-  const chatId = customChatId || config.telegramChatId || DEFAULT_CONFIG.telegramChatId;
-
-  if (!botToken || !chatId) {
-    return { success: false, error: 'Ingresa el Bot Token y tu Chat ID primero.' };
-  }
-
-  try {
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: '🧪 <b>Prueba de Notificación de Simple ProX</b>\n\n¡Tu Bot de Telegram está funcionando correctamente! 🎉\n\n💡 <b>Control Remoto de Clave:</b> Puedes cambiar la Clave Maestra en cualquier momento enviando a este chat el comando:\n<code>/clave TuNuevaClave</code>',
-        parse_mode: 'HTML'
-      })
-    });
-
-    const data = await response.json();
-    if (response.ok && data.ok) {
-      return { success: true, message: '¡Mensaje de prueba enviado con éxito a tu Telegram!' };
-    } else {
-      const rawDesc = data.description || 'Respuesta desconocida de Telegram';
-      const code = response.status;
-      return { 
-        success: false, 
-        error: `Telegram Error [${code}]: "${rawDesc}". Verifica que el Token no tenga espacios y que tu Chat ID sea solo números.` 
-      };
-    }
-  } catch (e) {
-    return { success: false, error: 'Sin conexión a internet o error de red: ' + e.message };
-  }
+export async function testTelegramNotification() {
+  return {
+    success: false,
+    error: 'Notificaciones directas de Telegram deshabilitadas en el cliente por seguridad. Deben canalizarse a través del backend.'
+  };
 }
 
 export async function processActivation({ negocio, direccion, telefono, instalador, masterKeyInput, version = APP_VERSION }) {
   const remoteMasterKey = await fetchRemoteMasterKey();
 
-  // Si existe una clave maestra configurada remotamente o en terminal, validarla
-  if (remoteMasterKey && masterKeyInput.trim() !== remoteMasterKey) {
+  // FAIL CLOSED: No permitir activación si no hay una clave configurada/obtenida válidamente
+  if (!remoteMasterKey || typeof remoteMasterKey !== 'string' || !remoteMasterKey.trim()) {
+    return {
+      success: false,
+      error: 'No fue posible validar la clave de activación. Verifique la configuración o conexión con el servicio de activación.'
+    };
+  }
+
+  // Si existe una clave maestra configurada remotamente o en terminal, validarla estrictamente
+  if (masterKeyInput.trim() !== remoteMasterKey.trim()) {
     return { success: false, error: 'La Clave Maestra ingresada es incorrecta o fue cambiada.' };
   }
 

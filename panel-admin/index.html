@@ -955,7 +955,7 @@
 <body>
 
   <!-- Auth Overlay -->
-  <div id="auth-overlay" style="display: none;">
+  <div id="auth-overlay" style="display: flex;">
     <div class="auth-card">
       <div class="brand-icon" style="margin: 0 auto 16px;">SPX</div>
       <h2 style="margin-bottom: 8px;">Simple ProX B2B</h2>
@@ -963,7 +963,6 @@
       <input type="email" id="auth-email" class="auth-input" placeholder="Correo electrónico" />
       <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" />
       <button class="auth-btn" onclick="handleLogin()">Iniciar Sesión</button>
-      <button type="button" class="btn btn-secondary" style="margin-top: 10px; width: 100%; justify-content: center; font-size: 13px;" onclick="document.getElementById('auth-overlay').style.display='none'; initApp();">Acceso Local / Sin Conexión</button>
       <div id="auth-error"></div>
     </div>
   </div>
@@ -2036,6 +2035,13 @@
       
       if (url && key) {
         supabaseClient = window.supabase.createClient(url, key);
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_OUT' || !session) {
+            authSession = null;
+            const authOverlay = document.getElementById('auth-overlay');
+            if (authOverlay) authOverlay.style.display = 'flex';
+          }
+        });
         return true;
       }
       return false;
@@ -2094,10 +2100,19 @@
       authSession = null;
       const authOverlay = document.getElementById('auth-overlay');
       if (authOverlay) authOverlay.style.display = 'flex';
+      const merchantsList = document.getElementById('merchants-list');
+      if (merchantsList) merchantsList.innerHTML = '';
+      const campaignsList = document.getElementById('campaigns-list');
+      if (campaignsList) campaignsList.innerHTML = '';
     }
 
     // Wrap initialization
     async function initApp() {
+      if (!authSession || !authSession.user) {
+        const authOverlay = document.getElementById('auth-overlay');
+        if (authOverlay) authOverlay.style.display = 'flex';
+        return;
+      }
       loadSettings();
       if (typeof updateConnectionStatus === 'function') updateConnectionStatus();
       if (typeof loadCategories === 'function') await loadCategories();

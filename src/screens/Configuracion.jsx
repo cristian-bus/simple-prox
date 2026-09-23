@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Copy, Percent, Save, Check, Calendar, Send, Bell, RefreshCw, Key, DownloadCloud, Wifi, WifiOff } from 'lucide-react';
 import { generateLicenseKey, isValidLicenseKey } from '../hooks/useKiosco';
-import { testTelegramNotification, fetchRemoteMasterKey } from '../services/activationService';
 import { generate5MonthsDemoData } from '../utils/demoDataGenerator';
 import { registerMerchantRemotely } from '../services/adSyncEngine';
 import { ARGENTINA_PROVINCES, getCitiesForProvince } from '../utils/argentinaGeo';
@@ -47,36 +46,6 @@ const Configuracion = ({ kiosco }) => {
   const [generatedKey, setGeneratedKey] = useState('');
 
   const [globalMargin, setGlobalMargin] = useState('');
-  
-  // Telegram Settings State
-  const [telegramToken, setTelegramToken] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.telegramBotToken || '';
-  });
-  const [telegramChatId, setTelegramChatId] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.telegramChatId || '';
-  });
-  const [telegramMasterKey, setTelegramMasterKey] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.masterKey || 'ProX2026MasterKey';
-  });
-  const [telegramTestLoading, setTelegramTestLoading] = useState(false);
-  const [telegramTestResult, setTelegramTestResult] = useState(null);
-  const [showTelegramSuccess, setShowTelegramSuccess] = useState(false);
-  const [activeRemoteKey, setActiveRemoteKey] = useState('');
-  const [loadingRemoteKey, setLoadingRemoteKey] = useState(false);
-
-  const refreshLiveRemoteKey = async () => {
-    setLoadingRemoteKey(true);
-    const key = await fetchRemoteMasterKey();
-    setActiveRemoteKey(key);
-    setLoadingRemoteKey(false);
-  };
-
-  useEffect(() => {
-    refreshLiveRemoteKey();
-  }, []);
   
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
@@ -211,27 +180,6 @@ const Configuracion = ({ kiosco }) => {
 
     setShowBusinessSuccess(true);
     setTimeout(() => setShowBusinessSuccess(false), 3000);
-  };
-
-  const handleSaveTelegramSettings = () => {
-    const existing = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    const newConfig = {
-      ...existing,
-      telegramBotToken: telegramToken.trim(),
-      telegramChatId: telegramChatId.trim(),
-      masterKey: telegramMasterKey.trim()
-    };
-    localStorage.setItem('kioscoprox_remote_config', JSON.stringify(newConfig));
-    setShowTelegramSuccess(true);
-    setTimeout(() => setShowTelegramSuccess(false), 3000);
-  };
-
-  const handleTestTelegramInConfig = async () => {
-    setTelegramTestLoading(true);
-    setTelegramTestResult(null);
-    const res = await testTelegramNotification(telegramToken.trim(), telegramChatId.trim());
-    setTelegramTestResult(res);
-    setTelegramTestLoading(false);
   };
 
   return (

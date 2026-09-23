@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Shield, KeyRound, Building2, MapPin, Phone, UserCheck, AlertCircle, CheckCircle2, Loader2, Settings, Send } from 'lucide-react';
-import { processActivation, testTelegramNotification } from '../services/activationService';
+import { Shield, KeyRound, Building2, MapPin, Phone, UserCheck, AlertCircle, CheckCircle2, Loader2, Settings } from 'lucide-react';
+import { processActivation } from '../services/activationService';
 import { registerMerchantRemotely } from '../services/adSyncEngine';
 import { APP_VERSION } from '../constants/version';
 
@@ -16,43 +16,27 @@ export default function ActivationGuard({ kiosco, onActivated }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Modal para configurar Telegram Bot / Clave Maestra
+  // Modal para configurar Servidor / Clave Maestra
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
-  const [testResult, setTestResult] = useState(null);
 
   const [remoteUrl, setRemoteUrl] = useState(() => {
     const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
     return config.remoteConfigUrl || '';
-  });
-  const [botToken, setBotToken] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.telegramBotToken || '';
-  });
-  const [chatId, setChatId] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.telegramChatId || '';
   });
   const [localMasterKey, setLocalMasterKey] = useState(() => {
     const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
     return config.masterKey || '';
   });
 
-  const handleTestTelegram = async () => {
-    setTestLoading(true);
-    setTestResult(null);
-    const res = await testTelegramNotification(botToken.trim(), chatId.trim());
-    setTestResult(res);
-    setTestLoading(false);
-  };
-
   const handleSaveConfig = () => {
+    const existing = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
     const newConfig = {
+      ...existing,
       remoteConfigUrl: remoteUrl.trim(),
-      telegramBotToken: botToken.trim(),
-      telegramChatId: chatId.trim(),
       masterKey: localMasterKey.trim()
     };
+    delete newConfig.telegramBotToken;
+    delete newConfig.telegramChatId;
     localStorage.setItem('kioscoprox_remote_config', JSON.stringify(newConfig));
     setShowConfigModal(false);
   };
@@ -419,7 +403,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
         </form>
       </div>
 
-      {/* Modal de Configuración de Telegram y Servidor Nube */}
+      {/* Modal de Configuración de Servidor Nube y Clave Maestra */}
       {showConfigModal && (
         <div style={{
           position: 'fixed',
@@ -444,43 +428,17 @@ export default function ActivationGuard({ kiosco, onActivated }) {
             color: '#f8fafc'
           }}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0', color: '#ffffff' }}>
-              Configuración de Notificaciones y Clave
+              Configuración de Autorización y Clave
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', color: '#cbd5e1' }}>
-                  Telegram Bot Token:
+                  URL de Validación / Configuración Remota (Opcional):
                 </label>
                 <input
                   type="text"
-                  placeholder="ej. 123456789:ABCdefGHIjklMNOpqrs"
-                  value={botToken}
-                  onChange={e => setBotToken(e.target.value)}
-                  style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', color: '#cbd5e1' }}>
-                  Telegram Chat ID (Tu Celular):
-                </label>
-                <input
-                  type="text"
-                  placeholder="ej. 987654321"
-                  value={chatId}
-                  onChange={e => setChatId(e.target.value)}
-                  style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', color: '#cbd5e1' }}>
-                  URL de Clave Maestra Remota (Opcional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://api.jsonbin.io/v3/b/... o Supabase"
+                  placeholder="https://... o endpoint de configuración"
                   value={remoteUrl}
                   onChange={e => setRemoteUrl(e.target.value)}
                   style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
@@ -489,10 +447,11 @@ export default function ActivationGuard({ kiosco, onActivated }) {
 
               <div>
                 <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', color: '#cbd5e1' }}>
-                  Clave Maestra Local de Respaldo:
+                  Clave Maestra de Activación para este Terminal:
                 </label>
                 <input
-                  type="text"
+                  type="password"
+                  placeholder="Ingresa la clave maestra autorizada"
                   value={localMasterKey}
                   onChange={e => setLocalMasterKey(e.target.value)}
                   style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
@@ -500,57 +459,19 @@ export default function ActivationGuard({ kiosco, onActivated }) {
               </div>
             </div>
 
-            {testResult && (
-              <div style={{
-                marginTop: '12px',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                backgroundColor: testResult.success ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                color: testResult.success ? '#86efac' : '#fca5a5',
-                border: `1px solid ${testResult.success ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-              }}>
-                {testResult.success ? testResult.message : testResult.error}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '20px', justifyContent: 'flex-end', alignItems: 'center' }}>
               <button
-                type="button"
-                onClick={handleTestTelegram}
-                disabled={testLoading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 14px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  borderRadius: '8px',
-                  color: '#60a5fa',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: testLoading ? 'wait' : 'pointer'
-                }}
+                onClick={() => setShowConfigModal(false)}
+                style={{ padding: '9px 14px', backgroundColor: 'transparent', border: '1px solid #475569', borderRadius: '8px', color: '#cbd5e1', cursor: 'pointer', fontSize: '13px' }}
               >
-                <Send size={15} />
-                {testLoading ? 'Enviando...' : 'Probar Notificación'}
+                Cancelar
               </button>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setShowConfigModal(false)}
-                  style={{ padding: '9px 14px', backgroundColor: 'transparent', border: '1px solid #475569', borderRadius: '8px', color: '#cbd5e1', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveConfig}
-                  style={{ padding: '9px 16px', backgroundColor: '#2563eb', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
-                >
-                  Guardar
-                </button>
-              </div>
+              <button
+                onClick={handleSaveConfig}
+                style={{ padding: '9px 16px', backgroundColor: '#2563eb', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+              >
+                Guardar
+              </button>
             </div>
           </div>
         </div>
