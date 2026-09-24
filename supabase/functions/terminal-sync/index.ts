@@ -32,19 +32,49 @@ Deno.serve(async (req: Request) => {
 
   try {
     // -------------------------------------------------------------------------
-    // RUTA: /issue-ticket (Emisión de Enrollment Ticket - Requiere Sesión Admin)
+    // RUTA: /issue-ticket (Emisión de Enrollment Ticket - Autoridad Admin Estricta)
     // -------------------------------------------------------------------------
     if (action === "issue-ticket" && req.method === "POST") {
       const authHeader = req.headers.get("authorization") || "";
       const jwt = authHeader.replace(/^Bearer\s+/i, "");
       
+      if (!jwt) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "No autenticado: falta encabezado Authorization Bearer" 
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 1. Validar autenticidad del JWT con Supabase Auth
       const { data: { user }, error: userError } = await adminClient.auth.getUser(jwt);
       if (userError || !user) {
         return new Response(JSON.stringify({ 
           success: false, 
-          error: "No autorizado: se requiere sesión administrativa para emitir tickets de enrolamiento" 
+          error: "No autenticado: token JWT inválido o expirado" 
         }), {
           status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 2. REGLA CRÍTICA: Validar privilegios de administrador real (admin_users)
+      // Un usuario 'authenticated' común NO tiene permiso para emitir tickets (Fase 0.2.1a)
+      const { data: adminRecord, error: adminQueryErr } = await adminClient
+        .from("admin_users")
+        .select("user_id, is_active")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (adminQueryErr || !adminRecord) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Acceso denegado: el usuario autenticado no posee privilegios administrativos autorizados"
+        }), {
+          status: 403,
           headers: corsHeaders
         });
       }
@@ -64,7 +94,8 @@ Deno.serve(async (req: Request) => {
       // Generar ticket criptográfico de 256 bits de un solo uso
       const rawTicket = "spx_ticket_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
       const ticketHash = await sha256Hex(rawTicket);
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 horas
+      // Duración unificada estricta server-side: 30 minutos exactos
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
       const { error: insertTicketError } = await adminClient
         .from("terminal_enrollment_tickets")
@@ -97,7 +128,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // -------------------------------------------------------------------------
-    // RUTA: /enroll (Enrolamiento Seguro: Consumo Atómico de Enrollment Ticket)
+    // RUTA: /enroll (Enrolamiento Seguro: Consumo Atómico Transaccional con RPC)
     // -------------------------------------------------------------------------
     if (action === "enroll" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
@@ -115,98 +146,47 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // 1. Verificar si la terminal ya fue enrolada previamente y está activa
-      const { data: existingIdentity } = await adminClient
-        .from("terminal_identities")
-        .select("installation_id, status")
-        .eq("installation_id", installationId)
-        .maybeSingle();
-
-      if (existingIdentity && existingIdentity.status === "active") {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: "Terminal ya enrolada previamente con credencial activa." 
-        }), {
-          status: 409,
-          headers: corsHeaders
-        });
-      }
-
-      // 2. Consumo Atómico del Ticket:
-      // Solo tiene éxito si coincide el ticket_hash, installation_id, status = 'pending' y no ha expirado
       const ticketHash = await sha256Hex(enrollmentTicket);
-      const nowIso = new Date().toISOString();
-
-      const { data: consumedTicket, error: ticketError } = await adminClient
-        .from("terminal_enrollment_tickets")
-        .update({
-          status: "used",
-          used_at: nowIso
-        })
-        .eq("ticket_hash", ticketHash)
-        .eq("installation_id", installationId)
-        .eq("status", "pending")
-        .gt("expires_at", nowIso)
-        .select("installation_id, commerce_id, store_name")
-        .maybeSingle();
-
-      if (ticketError || !consumedTicket) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: "Ticket de enrolamiento inválido, expirado, ya utilizado o no asignado a esta terminal." 
-        }), {
-          status: 403,
-          headers: corsHeaders
-        });
-      }
-
-      // 3. Generar token de terminal criptográfico de alta entropía (256 bits)
+      // Generar token de terminal criptográfico de alta entropía (256 bits)
       const rawToken = "spx_term_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
       const tokenHash = await sha256Hex(rawToken);
 
-      // 4. Registrar en terminal_identities
-      const { error: idError } = await adminClient
-        .from("terminal_identities")
-        .upsert({
-          installation_id: installationId,
-          token_hash: tokenHash,
-          commerce_id: consumedTicket.commerce_id || body.commerceId || null,
-          status: "active",
-          last_used_at: nowIso
+      // Consumo y Enrolamiento Atómico Transaccional vía PostgreSQL RPC
+      // No confía en body.commerceId ni body.storeName. No auto-crea merchants.
+      const { data: enrollResult, error: rpcError } = await adminClient
+        .rpc("enroll_terminal_with_ticket", {
+          p_ticket_hash: ticketHash,
+          p_installation_id: installationId,
+          p_token_hash: tokenHash
         });
 
-      if (idError) {
-        return new Response(JSON.stringify({ success: false, error: "Error registrando identidad" }), {
+      if (rpcError) {
+        return new Response(JSON.stringify({ success: false, error: "Error en procedimiento de enrolamiento" }), {
           status: 500,
           headers: corsHeaders
         });
       }
 
-      // 5. Vincular/crear en merchants ÚNICAMENTE con los datos autorizados del ticket
-      const { data: existingMerchant } = await adminClient
-        .from("merchants")
-        .select("id")
-        .eq("id", installationId)
-        .maybeSingle();
+      if (!enrollResult || !enrollResult.success) {
+        const statusCode = enrollResult?.code === "ALREADY_ENROLLED" ? 409
+                         : enrollResult?.code === "MERCHANT_NOT_PROVISIONED" ? 422
+                         : 403;
 
-      if (!existingMerchant) {
-        await adminClient.from("merchants").insert({
-          id: installationId,
-          installation_id: installationId,
-          commerce_id: consumedTicket.commerce_id || body.commerceId || ("COMM-" + installationId),
-          name: consumedTicket.store_name || body.storeName || `Kiosco ${installationId}`,
-          plan: "Básico",
-          status: "active",
-          registered_at: nowIso,
-          last_seen_at: nowIso,
-          last_active: nowIso
+        return new Response(JSON.stringify({
+          success: false,
+          code: enrollResult?.code || "ENROLL_FAILED",
+          error: enrollResult?.error || "No se pudo enrolar la terminal"
+        }), {
+          status: statusCode,
+          headers: corsHeaders
         });
       }
 
       return new Response(JSON.stringify({
         success: true,
         terminalToken: rawToken,
-        installationId
+        installationId: enrollResult.installation_id,
+        commerceId: enrollResult.commerce_id
       }), {
         status: 200,
         headers: corsHeaders
@@ -281,6 +261,7 @@ Deno.serve(async (req: Request) => {
     if (action === "register" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
 
+      // REGLA CRÍTICA: NO permitir alterar commerce_id ni installation_id mediante /register
       const mData: Record<string, unknown> = {
         id: termId,
         installation_id: termId,
@@ -302,9 +283,8 @@ Deno.serve(async (req: Request) => {
         mData.city = body.cityName.trim().slice(0, 100);
       }
       if (typeof body.appVersion === "string") mData.app_version = body.appVersion.slice(0, 30);
-      if (typeof body.commerceId === "string") mData.commerce_id = body.commerceId.slice(0, 50);
 
-      // Usar upsert merge con ID de la terminal autenticada
+      // Usar upsert merge con ID de la terminal autenticada (sin alterar commerce_id)
       const { error: upsertError } = await adminClient
         .from("merchants")
         .upsert(mData, { onConflict: "id" });
@@ -323,7 +303,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // -------------------------------------------------------------------------
-    // RUTA: /events (Lote de Métricas - Vinculación Forzada y Validación de Campañas)
+    // RUTA: /events (Lote de Métricas - Validación Estricta de Campañas)
     // -------------------------------------------------------------------------
     if (action === "events" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
@@ -343,7 +323,10 @@ Deno.serve(async (req: Request) => {
         const eventType = String(ev.eventType || ev.event_type || "");
         if (!validTypes.has(eventType)) continue;
 
-        const campaignId = ev.campaignId || ev.campaign_id || null;
+        const rawCampaignId = ev.campaignId || ev.campaign_id;
+        const campaignId = (typeof rawCampaignId === "string" && rawCampaignId.trim().length > 0)
+          ? rawCampaignId.trim()
+          : null;
 
         sanitizedEvents.push({
           event_id: String(ev.eventId || ev.event_id || `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
@@ -356,7 +339,12 @@ Deno.serve(async (req: Request) => {
       }
 
       // Validación batch eficiente: validar existencia de campaign_id en 1 sola consulta
-      const uniqueCampaignIds = [...new Set(sanitizedEvents.map(e => e.campaign_id).filter(Boolean))];
+      const uniqueCampaignIds = [...new Set(
+        sanitizedEvents
+          .map(e => e.campaign_id)
+          .filter((cid): cid is string => Boolean(cid))
+      )];
+
       if (uniqueCampaignIds.length > 0) {
         const { data: existingCampaigns } = await adminClient
           .from("campaigns")
@@ -364,11 +352,14 @@ Deno.serve(async (req: Request) => {
           .in("id", uniqueCampaignIds);
 
         const existingSet = new Set((existingCampaigns || []).map((c: { id: string }) => c.id));
-        sanitizedEvents = sanitizedEvents.map(e => {
-          if (e.campaign_id && !existingSet.has(e.campaign_id)) {
-            return { ...e, campaign_id: null };
+
+        // REGLA CRÍTICA: Si el evento declara un campaign_id que no existe en campaigns,
+        // se DESCARTA el evento del lote (no se convierte en null).
+        sanitizedEvents = sanitizedEvents.filter(e => {
+          if (e.campaign_id) {
+            return existingSet.has(e.campaign_id);
           }
-          return e;
+          return true; // Conservar eventos legítimos sin campaña asociada (si existen)
         });
       }
 

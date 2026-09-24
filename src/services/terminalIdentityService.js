@@ -7,7 +7,8 @@ import { getAdConfig } from './adSyncEngine.js';
 
 const STORAGE_KEYS = {
   TOKEN_ENC: 'kioscoprox_terminal_cred_enc',
-  TOKEN_RAW: 'kioscoprox_terminal_cred_token'
+  TOKEN_RAW: 'kioscoprox_terminal_cred_token',
+  ENROLLMENT_TICKET: 'kioscoprox_enrollment_ticket'
 };
 
 const DEFAULT_SUPABASE_URL = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
@@ -67,7 +68,7 @@ export async function storeTerminalToken(token) {
 }
 
 /**
- * Obtener el token existente o enrolar la terminal en el backend seguro si no posee uno
+ * Obtener el token existente o enrolar la terminal en el backend seguro si posee un ticket autorizado
  */
 export async function getOrEnrollTerminalToken() {
   let token = await getStoredTerminalToken();
@@ -76,7 +77,15 @@ export async function getOrEnrollTerminalToken() {
   const installationId = getInstallationId();
   if (!installationId) return null;
 
-  const profile = getCommerceProfile();
+  const enrollmentTicket = (typeof localStorage !== 'undefined')
+    ? localStorage.getItem(STORAGE_KEYS.ENROLLMENT_TICKET)
+    : null;
+
+  // Si no hay ticket de enrolamiento autorizado, no se puede auto-enrolar (mitigación First-Claim Hijacking)
+  if (!enrollmentTicket) {
+    return null;
+  }
+
   const syncUrl = getTerminalSyncUrl();
 
   try {
@@ -85,8 +94,7 @@ export async function getOrEnrollTerminalToken() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         installationId,
-        commerceId: profile.commerceId,
-        storeName: profile.storeName
+        enrollmentTicket
       })
     });
 
@@ -94,6 +102,9 @@ export async function getOrEnrollTerminalToken() {
       const data = await res.json();
       if (data.success && data.terminalToken) {
         await storeTerminalToken(data.terminalToken);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(STORAGE_KEYS.ENROLLMENT_TICKET);
+        }
         return data.terminalToken;
       }
     }
