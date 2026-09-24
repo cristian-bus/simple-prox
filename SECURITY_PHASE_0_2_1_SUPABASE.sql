@@ -1,4 +1,4 @@
--- KioscoProX / Simple ProX — Script SQL Fase 0.2.1a
+-- KioscoProX / Simple ProX — Script SQL Fase 0.2.1 / 0.2.1a / 0.2.1b
 -- Proyecto Supabase: qtixbiikhvhzwshfgyeo
 -- Fecha: 23 de Septiembre de 2026
 -- Modo: CAMBIO QUIRÚRGICO — BORRADOR LOCAL — NO EJECUTAR EN PRODUCCIÓN
@@ -67,14 +67,16 @@ COMMENT ON TABLE public.terminal_enrollment_tickets IS 'Tickets criptográficos 
 -- ==============================================================================
 -- 3. FUNCIÓN RPC TRANSACCIONAL ATÓMICA (enroll_terminal_with_ticket)
 -- ==============================================================================
--- Propósito: Garantizar atomicidad estricta en el enrolamiento.
+-- Propósito: Garantizar atomicidad estricta y protección contra reactivación indebida (Fase 0.2.1b).
 -- Precondiciones:
---   a) Merchant debe estar pre-provisionado en public.merchants (NO auto-crear).
---   b) Terminal no debe tener identidad activa previa.
+--   a) Terminal no debe existir en terminal_identities:
+--      - Si existe con status 'active' -> ALREADY_ENROLLED (409).
+--      - Si existe con status 'revoked', 'suspended' u otro -> REENROLL_REQUIRES_ADMIN_RESET (409).
+--   b) Merchant debe estar pre-provisionado en public.merchants (NO auto-crear).
 --   c) Ticket debe ser válido, pending y no expirado.
 -- En una sola transacción:
 --   - Marca ticket como 'used'.
---   - Crea/actualiza registro en terminal_identities.
+--   - Realiza INSERT estricto en terminal_identities (SIN ON CONFLICT DO UPDATE).
 -- Si cualquier paso falla, NO se consume el ticket y se revierte todo.
 
 CREATE OR REPLACE FUNCTION public.enroll_terminal_with_ticket(
@@ -88,21 +90,33 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_existing_status TEXT;
   v_ticket RECORD;
   v_merchant RECORD;
   v_now TIMESTAMPTZ := now();
   v_target_commerce_id TEXT;
 BEGIN
-  -- 1. Verificar si ya existe una identidad activa para esta instalación
-  IF EXISTS (
-    SELECT 1 FROM public.terminal_identities
-    WHERE installation_id = p_installation_id AND status = 'active'
-  ) THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'code', 'ALREADY_ENROLLED',
-      'error', 'Terminal ya enrolada previamente con credencial activa.'
-    );
+  -- 1. REGLA DE ESTADOS (Fase 0.2.1b): Verificar si ya existe cualquier identidad previa
+  SELECT status INTO v_existing_status
+  FROM public.terminal_identities
+  WHERE installation_id = p_installation_id;
+
+  IF FOUND THEN
+    IF v_existing_status = 'active' THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'code', 'ALREADY_ENROLLED',
+        'error', 'Terminal ya enrolada previamente con credencial activa.'
+      );
+    ELSE
+      -- revoked, suspended o cualquier otro estado: FAIL CLOSED
+      -- Prohibido reactivar automáticamente una identidad revocada o suspendida
+      RETURN jsonb_build_object(
+        'success', false,
+        'code', 'REENROLL_REQUIRES_ADMIN_RESET',
+        'error', 'Terminal en estado ''' || v_existing_status || ''': re-enrolamiento bloqueado, requiere reset administrativo previo.'
+      );
+    END IF;
   END IF;
 
   -- 2. Verificar precondición estricta: merchant debe existir pre-provisionado
@@ -116,6 +130,7 @@ BEGIN
   END IF;
 
   -- 3. Consumo atómico del ticket con bloqueo de fila
+  -- Solo se consume si las precondiciones 1 y 2 fueron superadas exitosamente
   UPDATE public.terminal_enrollment_tickets
   SET status = 'used',
       used_at = v_now
@@ -136,7 +151,8 @@ BEGIN
   -- Determinar el commerce_id definitivo (prioridad ticket -> merchant existente)
   v_target_commerce_id := COALESCE(v_ticket.commerce_id, v_merchant.commerce_id, p_installation_id);
 
-  -- 4. Registrar identidad segura en terminal_identities
+  -- 4. Registrar identidad segura en terminal_identities (SOLO INSERT ESTRICTO, SIN ON CONFLICT DO UPDATE)
+  -- Si ya existiera por condición de carrera no detectada, el PRIMARY KEY falla cerrado y revierte la transacción.
   INSERT INTO public.terminal_identities (
     installation_id,
     token_hash,
@@ -151,12 +167,7 @@ BEGIN
     'active',
     v_now,
     v_now
-  )
-  ON CONFLICT (installation_id) DO UPDATE
-  SET token_hash = EXCLUDED.token_hash,
-      commerce_id = EXCLUDED.commerce_id,
-      status = 'active',
-      last_used_at = v_now;
+  );
 
   RETURN jsonb_build_object(
     'success', true,
@@ -170,4 +181,4 @@ $$;
 REVOKE ALL ON FUNCTION public.enroll_terminal_with_ticket(TEXT, TEXT, TEXT) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.enroll_terminal_with_ticket(TEXT, TEXT, TEXT) TO service_role;
 
-COMMENT ON FUNCTION public.enroll_terminal_with_ticket IS 'Procedimiento atómico transaccional para enrolamiento seguro con ticket de un solo uso';
+COMMENT ON FUNCTION public.enroll_terminal_with_ticket IS 'Procedimiento atómico transaccional para enrolamiento seguro con ticket de un solo uso y bloqueo de reactivación indebida';

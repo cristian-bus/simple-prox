@@ -1,8 +1,8 @@
-# ARQUITECTURA DE SEGURIDAD — FASE 0.2.1 / 0.2.1a: ENROLAMIENTO SEGURO Y CONTROL DE IDENTIDAD
+# ARQUITECTURA DE SEGURIDAD — FASE 0.2.1 / 0.2.1a / 0.2.1b: ENROLAMIENTO SEGURO Y CONTROL DE IDENTIDAD
 **Proyecto:** KioscoProX / Simple ProX  
 **Versión:** 1.3.9  
 **Fecha:** 23 de Septiembre de 2026  
-**Rama:** `security/phase-0.2.1a-enrollment-review-fixes`  
+**Rama:** `security/phase-0.2.1b-revocation-hardening`  
 **Estado:** BORRADOR QUIRÚRGICO LOCAL — PENDIENTE DE REVISIÓN (NO DESPLEGADO)  
 
 ---
@@ -20,63 +20,73 @@ Al auditar la implementación real de la Supabase Edge Function `terminal-sync`,
 3. **Confianza en datos del cliente para identidad**:
    - `/enroll` utilizaba `body.commerceId` enviado por el cliente para fijar la identidad comercial.
    - `/register` permitía que una terminal ya autenticada modificase arbitrariamente su `commerce_id`.
+   - `/issue-ticket` aceptaba `body.commerceId` y `body.storeName` del cliente en lugar de derivarlos server-side.
 4. **Validación de rol Admin en emisión de tickets**:
    - El endpoint `/issue-ticket` verificaba únicamente `auth.getUser(jwt)`, confundiendo cualquier usuario `authenticated` con un `admin` con privilegios para autorizar terminales.
-5. **Comportamiento destructivo ante HTTP 401**:
+5. **Riesgo de Reactivación de Terminales Revocadas/Suspendidas (Fase 0.2.1b)**:
+   - La RPC utilizaba `ON CONFLICT (installation_id) DO UPDATE SET status = 'active'`, lo que permitía que un ticket reactivara una terminal revocada o suspendida por razones de seguridad.
+6. **Comportamiento destructivo ante HTTP 401**:
    - `src/services/terminalIdentityService.js` eliminaba la credencial local ante cualquier 401 transitorio o desautorización, provocando que la terminal intentase reenrolarse sin ticket y quedase bloqueada en 409.
 
 ---
 
 ## 2. MODELO DE AUTORIZACIÓN: ENROLLMENT TICKETS DE UN SOLO USO
 
-Para mitigar el First-Claim Hijacking sin introducir secretos globales compartidos en el cliente (prohibido por la Regla 6 de `AGENTS.md`), se diseñó un modelo de **Enrollment Ticket** emitido y controlado exclusivamente server-side.
+Para mitigar el First-Claim Hijacking sin introducir secretos globales compartidos en el cliente (prohibido por la Regla 6 de `AGENTS.md`), se diseñó un modelo de **Enrollment Ticket** emitido y controlado exclusivamente server-side:
 
 ```text
        ┌────────────────────────┐
        │ Administrador Auténtico│ (Sesión Supabase Auth en panel-admin)
        └───────────┬────────────┘
-                   │ 1. POST /issue-ticket (JWT Bearer)
+                   │ 1. POST /issue-ticket (JWT Bearer, installationId)
                    ▼
        ┌────────────────────────┐
        │ terminal-sync Function │
        └───────────┬────────────┘
                    │ 2. Verificar auth.getUser(jwt) -> user.id
-                   │ 3. Consultar public.admin_users (is_active = true)
-                   │    - Si NO es admin -> HTTP 403 Forbidden
-                   │    - Si ES admin -> Continuar
+                   │ 3. Consultar public.admin_users (is_active = true) -> Si NO: 403 Forbidden
+                   │ 4. Consultar public.merchants (id = installationId) -> Si NO: 422 MERCHANT_NOT_PROVISIONED
+                   │ 5. Consultar public.terminal_identities (installation_id):
+                   │    - active -> 409 ALREADY_ENROLLED
+                   │    - revoked/suspended/otro -> 409 REENROLL_REQUIRES_ADMIN_RESET
+                   │ 6. Derivar server-side: commerce_id y store_name desde merchants
+                   │    (Ignorar totalmente body.commerceId y body.storeName)
                    ▼
        ┌────────────────────────┐
        │ Generar Ticket Cripto  │ (32 bytes aleatorios criptográficos, prefijo 'spx_ticket_')
        │ Duración: 30 minutos   │ (Fijada estrictamente en backend)
        └───────────┬────────────┘
-                   │ 4. INSERT INTO terminal_enrollment_tickets
-                   │    (Guarda SHA-256(ticket), installation_id, expires_at, status='pending')
+                   │ 7. INSERT INTO terminal_enrollment_tickets
+                   │    (Guarda SHA-256(ticket), installation_id, commerce_id, store_name, expires_at, status='pending')
                    ▼
        ┌────────────────────────┐
        │ Retornar Ticket Crudo  │ (Entregado al operador/instalador una sola vez)
        └───────────┬────────────┘
-                   │ 5. Instalador/Kiosco ingresa el ticket
+                   │ 8. Instalador/Kiosco ingresa el ticket
                    ▼
        ┌────────────────────────┐
        │ POST /enroll (Kiosco)  │ ({ installationId, enrollmentTicket })
        └───────────┬────────────┘
-                   │ 6. Invocar RPC enroll_terminal_with_ticket
+                   │ 9. Invocar RPC enroll_terminal_with_ticket
                    ▼
        ┌────────────────────────────────────────────────────────┐
        │ Transacción Atómica en PostgreSQL (RPC SECURITY DEFINER)│
-       │ a) Precondición: ¿merchant pre-provisionado?           │
+       │ a) Precondición 1: ¿Existe identidad previa?           │
+       │    - active -> 409 ALREADY_ENROLLED                    │
+       │    - revoked/suspended/otro -> 409 REENROLL...RESET    │
+       │    (Ticket NO se consume)                              │
+       │ b) Precondición 2: ¿merchant pre-provisionado?         │
        │    NO -> Retorna 422 MERCHANT_NOT_PROVISIONED          │
-       │          (Ticket NO se consume)                        │
-       │ b) ¿Identidad activa previa?                           │
-       │    SÍ -> Retorna 409 ALREADY_ENROLLED                  │
+       │    (Ticket NO se consume)                              │
        │ c) UPDATE terminal_enrollment_tickets                  │
        │    SET status='used', used_at=now()                    │
        │    WHERE ticket_hash=$1 AND installation_id=$2         │
        │      AND status='pending' AND expires_at > now()       │
        │    (Row-level lock, previene doble consumo concurrente)│
        │ d) INSERT INTO terminal_identities                     │
+       │    (ESTRICTO, SIN ON CONFLICT DO UPDATE)               │
        └───────────┬────────────────────────────────────────────┘
-                   │ 7. Emitir terminalToken permanente a la terminal
+                   │ 10. Emitir terminalToken permanente a la terminal
                    ▼
        ┌────────────────────────┐
        │ Terminal Simple ProX   │
@@ -88,7 +98,22 @@ Para mitigar el First-Claim Hijacking sin introducir secretos globales compartid
 
 ## 3. PROPIEDADES DE SEGURIDAD DEL DISEÑO
 
-### A. Autoridad Administrativa Real (`admin_users`)
+### A. Reglas Estrictas de Estados e Imposibilidad de Reactivación (Fase 0.2.1b)
+- **No existe identidad previa**: Se permite el enrolamiento normal si el ticket es válido y el comercio está provisionado.
+- **Existe identidad con `status = 'active'`**: Se rechaza con error 409 `ALREADY_ENROLLED`.
+- **Existe identidad con `status = 'revoked'`**: Se rechaza con error 409 `REENROLL_REQUIRES_ADMIN_RESET`.
+- **Existe identidad con `status = 'suspended'`**: Se rechaza con error 409 `REENROLL_REQUIRES_ADMIN_RESET`.
+- **Existe identidad con cualquier otro estado**: Falla cerrado (`FAIL CLOSED`) rechazando con error 409 `REENROLL_REQUIRES_ADMIN_RESET`.
+- **Eliminación de `ON CONFLICT DO UPDATE`**: La RPC realiza únicamente un `INSERT` estricto en `terminal_identities`. Bajo ninguna circunstancia un ticket normal puede sobrescribir un registro revocado o suspendido.
+- **Conservación para auditoría**: Las identidades revocadas o suspendidas no se borran de la base de datos.
+
+### B. Derivación Server-Side en `/issue-ticket` (Fase 0.2.1b)
+- El administrador solo envía el `installationId`.
+- El servidor comprueba la existencia de la fila en `merchants` y extrae directamente de la base de datos el `commerce_id` y el `name`.
+- Si el request incluye `body.commerceId` o `body.storeName`, son **completamente ignorados**, impidiendo ataques de asignación cruzada de comercios (`installationId = A, commerceId = B`).
+- Si el comercio no está pre-provisionado, se responde con HTTP 422 `MERCHANT_NOT_PROVISIONED` y no se emite ningún ticket.
+
+### C. Autoridad Administrativa Real (`admin_users`)
 - No se confía en `auth.role() = 'authenticated'`. Un usuario común registrado en Supabase no puede emitir tickets.
 - Se implementó la tabla privada `public.admin_users` que vincula `user_id UUID REFERENCES auth.users(id)` con `is_active BOOLEAN`.
 - RLS activada con denegación absoluta para roles públicos (`anon`, `authenticated`). Solo `service_role` (usado por la Edge Function) puede consultarla.
@@ -98,28 +123,24 @@ Para mitigar el First-Claim Hijacking sin introducir secretos globales compartid
   VALUES ('<UUID_DEL_USUARIO_EN_AUTH_USERS>', true, 'Superadmin inicial');
   ```
 
-### B. Duración Estricta del Ticket (30 Minutos)
+### D. Duración Estricta del Ticket (30 Minutos)
 - La expiración es fijada unilateralmente por el servidor: `Date.now() + 30 * 60 * 1000`.
 - El cliente no puede enviar parámetros `duration`, `ttl` ni `expiresAt`.
 - Si el ticket no es canjeado en 30 minutos, expira automáticamente.
 
-### C. Consumo Atómico y Transaccional (PostgreSQL RPC)
-- Para evitar inconsistencias donde un ticket se marque como usado pero falle el registro de identidad o el comercio no exista, todo el flujo se consolidó en la función PostgreSQL con `SECURITY DEFINER`:
-  `public.enroll_terminal_with_ticket(p_ticket_hash, p_installation_id, p_token_hash)`
-- Si el comercio no está pre-provisionado en `merchants`, la RPC aborta con `MERCHANT_NOT_PROVISIONED` y el ticket **permanece intacto** (`pending`).
+### E. Consumo Atómico y Transaccional (PostgreSQL RPC)
+- Todo el flujo de verificación y enrolamiento se consolidó en la función PostgreSQL con `SECURITY DEFINER`:
+  `public.enroll_terminal_with_ticket(p_ticket_hash, p_installation_id, p_token_hash)`.
+- Si la terminal ya existe, o el comercio no está pre-provisionado, la RPC aborta antes de tocar el ticket, por lo que **el ticket permanece intacto** (`pending`).
 - El consumo del ticket utiliza un `UPDATE ... WHERE status = 'pending' AND expires_at > now()` con bloqueo a nivel de fila (`ROW LOCK`), impidiendo que dos solicitudes concurrentes utilicen el mismo ticket.
 
-### D. Eliminación de Creación Arbitraria de Comercios
-- `/enroll` ya no realiza `INSERT` en `merchants`.
-- La terminal solo puede enrolarse si el comercio fue previamente creado por el proceso de administración comercial.
-
-### E. Blindaje de Identidad en `/register`
+### F. Blindaje de Identidad en `/register`
 - `/register` ya no acepta ni procesa `commerceId` o `installationId` provenientes del payload.
 - Solo permite actualizar campos comerciales legítimos definidos en la allowlist: `name`, `address`, `phone`, `installer`, `business_type`, `province_code`, `province_name`, `city_code`, `city_name`, `app_version`.
 
-### F. Validación de Campañas en Lote en `/events`
+### G. Validación de Campañas en Lote en `/events`
 - Se evalúan los `campaign_id` únicos de cada lote en una sola consulta (`.in('id', uniqueCampaignIds)`).
-- **Regla estricta**: Si un evento declara un `campaign_id` que no existe en `campaigns`, dicho evento es **descartado del lote** (no se transforma en `null`), protegiendo la fidelidad de las métricas. Eventos sin campaña legítimos (nulos) se conservan.
+- **Regla estricta**: Si un evento declara un `campaign_id` que no existe en `campaigns`, dicho evento es **descartado del lote** (no transformado en `null`), protegiendo la fidelidad de las métricas. Eventos sin campaña legítimos (nulos) se conservan.
 
 ---
 

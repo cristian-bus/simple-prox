@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // 2. REGLA CRÍTICA: Validar privilegios de administrador real (admin_users)
-      // Un usuario 'authenticated' común NO tiene permiso para emitir tickets (Fase 0.2.1a)
+      // Un usuario 'authenticated' común NO tiene permiso para emitir tickets
       const { data: adminRecord, error: adminQueryErr } = await adminClient
         .from("admin_users")
         .select("user_id, is_active")
@@ -81,8 +81,6 @@ Deno.serve(async (req: Request) => {
 
       const body = await req.json().catch(() => ({}));
       const targetInstallationId = String(body.installationId || "").trim();
-      const commerceId = String(body.commerceId || "").trim();
-      const storeName = String(body.storeName || "").trim();
 
       if (!targetInstallationId || targetInstallationId.length < 3) {
         return new Response(JSON.stringify({ success: false, error: "installationId inválido" }), {
@@ -91,7 +89,60 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // Generar ticket criptográfico de 256 bits de un solo uso
+      // 3. PROBLEMA B (Fase 0.2.1b): Validar pre-provisión del comercio en merchants
+      const { data: merchantRecord, error: merchantErr } = await adminClient
+        .from("merchants")
+        .select("id, commerce_id, name")
+        .eq("id", targetInstallationId)
+        .maybeSingle();
+
+      if (merchantErr || !merchantRecord) {
+        return new Response(JSON.stringify({
+          success: false,
+          code: "MERCHANT_NOT_PROVISIONED",
+          error: "MERCHANT_NOT_PROVISIONED: El comercio asociado a este installationId no ha sido provisionado administrativamente"
+        }), {
+          status: 422,
+          headers: corsHeaders
+        });
+      }
+
+      // 4. PROBLEMA A (Fase 0.2.1b): Comprobar si ya existe una identidad previa en terminal_identities
+      const { data: existingIdentity } = await adminClient
+        .from("terminal_identities")
+        .select("installation_id, status")
+        .eq("installation_id", targetInstallationId)
+        .maybeSingle();
+
+      if (existingIdentity) {
+        if (existingIdentity.status === "active") {
+          return new Response(JSON.stringify({
+            success: false,
+            code: "ALREADY_ENROLLED",
+            error: "La terminal ya se encuentra enrolada con credencial activa"
+          }), {
+            status: 409,
+            headers: corsHeaders
+          });
+        } else {
+          // revoked, suspended u otro estado: no emitir ticket de enrolamiento normal
+          return new Response(JSON.stringify({
+            success: false,
+            code: "REENROLL_REQUIRES_ADMIN_RESET",
+            error: `La terminal se encuentra en estado '${existingIdentity.status}'. El re-enrolamiento requiere reset administrativo previo.`
+          }), {
+            status: 409,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // 5. PROBLEMA B: Derivar commerce_id y store_name exclusivamente server-side desde merchants
+      // (body.commerceId y body.storeName son COMPLETAMENTE ignorados para evitar asociación cruzada)
+      const derivedCommerceId = merchantRecord.commerce_id || targetInstallationId;
+      const derivedStoreName = merchantRecord.name || null;
+
+      // 6. Generar ticket criptográfico de 256 bits de un solo uso
       const rawTicket = "spx_ticket_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
       const ticketHash = await sha256Hex(rawTicket);
       // Duración unificada estricta server-side: 30 minutos exactos
@@ -102,8 +153,8 @@ Deno.serve(async (req: Request) => {
         .insert({
           ticket_hash: ticketHash,
           installation_id: targetInstallationId,
-          commerce_id: commerceId || null,
-          store_name: storeName || null,
+          commerce_id: derivedCommerceId,
+          store_name: derivedStoreName,
           expires_at: expiresAt,
           status: "pending",
           created_by: user.email || user.id
@@ -152,7 +203,7 @@ Deno.serve(async (req: Request) => {
       const tokenHash = await sha256Hex(rawToken);
 
       // Consumo y Enrolamiento Atómico Transaccional vía PostgreSQL RPC
-      // No confía en body.commerceId ni body.storeName. No auto-crea merchants.
+      // No confía en body.commerceId ni body.storeName. No auto-crea merchants. No reactiva terminales revocadas/suspendidas.
       const { data: enrollResult, error: rpcError } = await adminClient
         .rpc("enroll_terminal_with_ticket", {
           p_ticket_hash: ticketHash,
@@ -168,7 +219,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!enrollResult || !enrollResult.success) {
-        const statusCode = enrollResult?.code === "ALREADY_ENROLLED" ? 409
+        const statusCode = (enrollResult?.code === "ALREADY_ENROLLED" || enrollResult?.code === "REENROLL_REQUIRES_ADMIN_RESET") ? 409
                          : enrollResult?.code === "MERCHANT_NOT_PROVISIONED" ? 422
                          : 403;
 

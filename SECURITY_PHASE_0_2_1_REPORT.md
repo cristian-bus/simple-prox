@@ -1,88 +1,84 @@
-# INFORME DE SEGURIDAD — FASE 0.2.1 / 0.2.1a: REVISIÓN FINAL DEL ENROLAMIENTO SEGURO
+# INFORME DE SEGURIDAD — FASE 0.2.1 / 0.2.1a / 0.2.1b: CIERRE FINAL DE REVOCACIÓN Y ENROLAMIENTO
 **Proyecto:** KioscoProX / Simple ProX  
 **Fecha:** 23 de Septiembre de 2026  
 **Auditor / Ingeniero:** Senior Application, Supabase & PostgreSQL Security Engineer  
-**Rama de Trabajo:** `security/phase-0.2.1a-enrollment-review-fixes`  
-**Commit Backup Previo:** `c807d88` (`backup: estado previo a security phase 0.2.1a`)  
-**Commit Base Fase 0.2.1:** `11089dc`  
+**Rama de Trabajo:** `security/phase-0.2.1b-revocation-hardening`  
+**Commit Backup Previo:** `e7da732` (`backup: estado previo a security phase 0.2.1b`)  
+**Base Backup Fase 0.2.1a:** `c807d88`  
+**Base Backup Fase 0.2.1:** `11089dc`  
 
 ---
 
-## 1. RESUMEN EJECUTIVO
+## 1. RESUMEN EJECUTIVO (FASE 0.2.1b)
 
-Durante la Fase 0.2.1a se completó la revisión quirúrgica del borrador de enrolamiento seguro de terminales, resolviendo los 7 hallazgos detectados en la auditoría del diseño preliminar:
+Durante la Fase 0.2.1b se completó el endurecimiento definitivo del ciclo de vida de identidades y la emisión de tickets, mitigando los dos riesgos residuales identificados:
 
-1. **Autoridad Administrativa Real**: `/issue-ticket` ya no considera `authenticated` como admin. Valida contra la tabla privada `public.admin_users`, respondiendo con HTTP 403 ante usuarios autenticados sin privilegios.
-2. **Blindaje de Identidad en `/enroll`**: Se eliminó cualquier lectura de `body.commerceId` y `body.storeName` para decisiones de identidad. La asignación comercial proviene exclusivamente de la pre-provisión server-side.
-3. **Erradicación de Auto-Creación de Comercios**: `/enroll` no crea merchants arbitrariamente. Si el comercio no está pre-provisionado, la RPC responde con error 422 `MERCHANT_NOT_PROVISIONED` y el ticket **permanece intacto sin consumirse**.
-4. **Garantía de Atomicidad Estricta**: Se implementó la función RPC PostgreSQL `public.enroll_terminal_with_ticket` con `SECURITY DEFINER` y bloqueo de fila (`ROW LOCK`), asegurando que precondiciones, consumo de ticket e inserción de identidad ocurran de forma indivisible.
-5. **Blindaje de `/register`**: Se eliminó la posibilidad de modificar `commerce_id` desde una terminal autenticada.
-6. **Unificación de Duración del Ticket**: Duración fijada server-side en exactamente **30 minutos**.
-7. **Filtrado Estricto de Campañas en `/events`**: Eventos que declaren un `campaign_id` que no exista en la base de datos son **descartados** del lote.
+1. **Problema A (Bloqueo de Reactivación de Terminales Revocadas o Suspendidas)**:
+   - Se erradicó la instrucción `ON CONFLICT DO UPDATE` de la base de datos PostgreSQL.
+   - La RPC `enroll_terminal_with_ticket` ahora implementa una verificación estricta de estados previa: si existe un registro previo con estado `revoked`, `suspended` o cualquier otro estado no activo, rechaza la operación con código `REENROLL_REQUIRES_ADMIN_RESET` (HTTP 409) sin consumir el ticket ni alterar el hash ni el estado existente.
+2. **Problema B (Derivación Server-Side en `/issue-ticket`)**:
+   - `/issue-ticket` ya no confía en `commerceId` ni `storeName` provistos en el request.
+   - Comprueba la pre-existencia del comercio en `public.merchants`; si no existe, rechaza con HTTP 422 `MERCHANT_NOT_PROVISIONED`.
+   - Comprueba en `public.terminal_identities` si la terminal ya está activa (HTTP 409 `ALREADY_ENROLLED`) o revocada/suspendida (HTTP 409 `REENROLL_REQUIRES_ADMIN_RESET`).
+   - Deriva `commerce_id` y `store_name` directamente del registro de `merchants` en el servidor, almacenándolos de forma fidedigna en `terminal_enrollment_tickets`.
 
 ---
 
-## 2. PARÁMETROS TÉCNICOS OBLIGATORIOS (SECCIÓN 48)
+## 2. PARÁMETROS TÉCNICOS OBLIGATORIOS (SECCIÓN 43)
 
 ```text
-Rama: security/phase-0.2.1a-enrollment-review-fixes
-Commit backup: c807d88 (backup: estado previo a security phase 0.2.1a)
+Rama: security/phase-0.2.1b-revocation-hardening
+Commit backup: e7da732 (backup: estado previo a security phase 0.2.1b)
 Commit final: Pendiente de confirmación tras commit de revisión
 
 Archivos modificados:
 - supabase/functions/terminal-sync/index.ts
-- src/services/terminalIdentityService.js
 - SECURITY_PHASE_0_2_1_SUPABASE.sql
-- SECURITY_PHASE_0_2_1_SUPABASE_ROLLBACK.sql
 - SECURITY_PHASE_0_2_1_ARCHITECTURE.md
 - SECURITY_PHASE_0_2_1_CHANGELOG.md
 - SECURITY_PHASE_0_2_1_REPORT.md
 
-Archivos nuevos:
-- Ninguno (actualización in-place de la documentación y scripts de la fase)
+IDENTIDADES:
 
-MODELO ADMIN:
-Cómo se determina un administrador:
-Mediante consulta server-side en la tabla privada public.admin_users (is_active = true) cruzando el user.id obtenido de adminClient.auth.getUser(jwt).
+No existe: Enrolamiento normal permitido (si el ticket es válido y el comercio está provisionado)
+Active: REJECT -> ALREADY_ENROLLED (HTTP 409)
+Revoked: REJECT -> REENROLL_REQUIRES_ADMIN_RESET (HTTP 409)
+Suspended: REJECT -> REENROLL_REQUIRES_ADMIN_RESET (HTTP 409)
+Otro estado: FAIL CLOSED -> REENROLL_REQUIRES_ADMIN_RESET (HTTP 409)
 
-Dónde se almacena esa autorización:
-En la tabla public.admin_users en la base de datos PostgreSQL de Supabase.
+¿Enrollment puede sobrescribir token existente?: NO (INSERT estricto, sin ON CONFLICT DO UPDATE)
+¿Enrollment puede cambiar revoked → active?: NO (bloqueado por precondición y ausencia de UPDATE)
+¿Enrollment puede cambiar suspended → active?: NO (bloqueado por precondición y ausencia de UPDATE)
 
-Cómo se crea el primer admin:
-Operación administrativa manual en SQL:
-INSERT INTO public.admin_users (user_id, is_active, notes)
-VALUES ('<UUID_DEL_USUARIO_EN_AUTH_USERS>', true, 'Superadmin inicial');
+ON CONFLICT DO UPDATE:
+ELIMINADO
 
-/issue-ticket:
-No autenticado: HTTP 401 Unauthorized
-Authenticated no-admin: HTTP 403 Forbidden
-Admin: HTTP 200 OK (retorna enrollmentTicket con validez de 30 min)
+ISSUE-TICKET:
 
-terminal_enrollment_tickets:
-anon acceso: REJECT (Denegado totalmente por RLS / REVOKE ALL)
-authenticated acceso: REJECT (Denegado totalmente por RLS / REVOKE ALL)
-service_role acceso: PERMITIDO (Exclusivo para la Edge Function)
+Datos recibidos del cliente: installationId (obligatorio, string)
+Datos obtenidos de merchants: commerce_id, name (obtenidos server-side por query)
+¿commerceId del request se utiliza?: NO (ignorado)
+¿storeName del request se utiliza?: NO (ignorado)
 
-Duración ticket:
-30 minutos fijos server-side (30 * 60 * 1000 ms). No configurable por cliente.
+Merchant inexistente: REJECT -> HTTP 422 MERCHANT_NOT_PROVISIONED
+Identidad active: REJECT -> HTTP 409 ALREADY_ENROLLED
+Identidad revoked: REJECT -> HTTP 409 REENROLL_REQUIRES_ADMIN_RESET
+Identidad suspended: REJECT -> HTTP 409 REENROLL_REQUIRES_ADMIN_RESET
 
-/enroll:
-¿acepta commerceId del cliente?: NO (ignorado para decisiones de identidad)
-¿acepta storeName del cliente para identidad?: NO (ignorado para decisiones de identidad)
-¿crea merchant automáticamente?: NO (eliminado todo insert arbitrario)
-¿qué pasa si merchant no existe?:
-Retorna HTTP 422 con código 'MERCHANT_NOT_PROVISIONED'. El ticket NO es consumido.
+TICKET:
 
-Atomicidad:
-¿Cómo se garantiza que ticket + identidad no queden en estado parcial?:
-Mediante la función RPC PostgreSQL 'public.enroll_terminal_with_ticket' ejecutada dentro de una única transacción con SECURITY DEFINER y bloqueo de fila (Row Lock). Si cualquier verificación falla, Postgres revierte todos los cambios.
+Duración: 30 minutos fijos server-side (30 * 60 * 1000 ms)
+Single-use: SÍ (status pasa de 'pending' a 'used' con row lock)
+Hash: SHA-256 (almacenado en terminal_enrollment_tickets)
+¿se consume ante MERCHANT_NOT_PROVISIONED?: NO (precondición comprobada antes del UPDATE del ticket)
+¿se consume ante ALREADY_ENROLLED?: NO (precondición comprobada antes del UPDATE del ticket)
+¿se consume ante REENROLL_REQUIRES_ADMIN_RESET?: NO (precondición comprobada antes del UPDATE del ticket)
 
-/register:
-¿puede cambiar commerceId?: NO (campo removido del procesamiento de /register)
+CONCURRENCIA:
 
-/events:
-campaign inexistente: Evento descartado del lote de inserción
-campaign ausente: Conservado con campaign_id null si el evento es legítimo
+Mismo ticket: Exactamente 1 request obtiene la fila vía Row-Level Lock; el concurrente falla (403)
+Dos tickets / mismo installationId:
+Exactamente 1 identidad es creada vía INSERT. El segundo request falla por conflicto con la PRIMARY KEY (installation_id) revirtiendo la transacción y dejando intacta la primera identidad.
 
 SQL:
 Preparado: SÍ (SECURITY_PHASE_0_2_1_SUPABASE.sql)
@@ -100,19 +96,19 @@ Vite v7.3.1 build client: EXIT CODE 0 (Sin errores de bundling ni sintaxis)
 Tests realmente ejecutados:
 - [TEST EJECUTADO] Compilación frontend Vite limpia (npm run build).
 - [TEST EJECUTADO] Verificación estática de sintaxis y tipos TypeScript en Deno Edge Function.
-- [TEST EJECUTADO] Análisis de coherencia transaccional y compatibilidad SQL en PostgreSQL.
-- [TEST EJECUTADO] Verificación de aislamiento RLS deny-by-default en scripts DDL.
+- [TEST EJECUTADO] Verificación de estructura PL/pgSQL y control de flujo de errores en RPC PostgreSQL.
+- [TEST EJECUTADO] Verificación de ausencia de ON CONFLICT DO UPDATE en todo el script DDL.
+- [TEST EJECUTADO] Verificación de aislamiento deny-by-default en RLS de tablas privadas.
 
 Tests pendientes:
 - [TEST PENDIENTE POR NO HABER DESPLEGADO] Invocación HTTP real contra endpoints de Supabase Cloud.
 - [TEST PENDIENTE POR NO HABER DESPLEGADO] Ejecución DDL en la base de datos qtixbiikhvhzwshfgyeo.
 
 Riesgos residuales:
-- Rate limiting por IP a nivel de Edge Network sigue dependiendo de la infraestructura nativa de Supabase Cloud.
-- El alta de nuevas terminales requerirá que el operador pre-registre el comercio y asigne el UUID del administrador en admin_users.
+- Operación de reactivación/re-enrolamiento de terminales legítimamente reemplazadas debe realizarse manualmente vía SQL o función administrativa específica que limpie o resetee el registro de terminal_identities.
 
 Rollback:
-- Rollback código: git checkout c807d88 -- supabase/functions/terminal-sync/index.ts src/services/terminalIdentityService.js
+- Rollback código: git checkout e7da732 -- supabase/functions/terminal-sync/index.ts SECURITY_PHASE_0_2_1_SUPABASE.sql
 - Rollback SQL: Ejecutar SECURITY_PHASE_0_2_1_SUPABASE_ROLLBACK.sql
 - Rollback Edge Function: La versión 1 original sigue activa en Supabase Cloud.
 ```
@@ -122,7 +118,7 @@ Rollback:
 ## 3. DECLARACIÓN FINAL DE ESTADO
 
 ```text
-FASE 0.2.1a PREPARADA PARA REVISIÓN
+FASE 0.2.1b PREPARADA PARA REVISIÓN
 
 EDGE FUNCTION DESPLEGADA: NO
 SQL EJECUTADO: NO
