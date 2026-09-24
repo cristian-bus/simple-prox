@@ -142,7 +142,38 @@ Deno.serve(async (req: Request) => {
       const derivedCommerceId = merchantRecord.commerce_id || targetInstallationId;
       const derivedStoreName = merchantRecord.name || null;
 
-      // 6. Generar ticket criptográfico de 256 bits de un solo uso
+      // 6. REGLA DE TICKET PENDING ÚNICO (Fase 0.2.1b - Ajuste Final):
+      // Comprobar si existe algún ticket en estado 'pending' para esta instalación
+      const nowIso = new Date().toISOString();
+      const { data: pendingTickets } = await adminClient
+        .from("terminal_enrollment_tickets")
+        .select("ticket_hash, expires_at")
+        .eq("installation_id", targetInstallationId)
+        .eq("status", "pending");
+
+      if (pendingTickets && pendingTickets.length > 0) {
+        for (const pt of pendingTickets) {
+          if (pt.expires_at > nowIso) {
+            // Existe un ticket pending válido y vigente: rechazar con 409
+            return new Response(JSON.stringify({
+              success: false,
+              code: "ENROLLMENT_TICKET_ALREADY_PENDING",
+              error: "Ya existe un ticket de enrolamiento pendiente y vigente para esta terminal"
+            }), {
+              status: 409,
+              headers: corsHeaders
+            });
+          } else {
+            // Ticket pending pero expirado: transicionar server-side a 'expired' (sin borrar historial)
+            await adminClient
+              .from("terminal_enrollment_tickets")
+              .update({ status: "expired" })
+              .eq("ticket_hash", pt.ticket_hash);
+          }
+        }
+      }
+
+      // 7. Generar ticket criptográfico de 256 bits de un solo uso
       const rawTicket = "spx_ticket_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
       const ticketHash = await sha256Hex(rawTicket);
       // Duración unificada estricta server-side: 30 minutos exactos
@@ -161,6 +192,21 @@ Deno.serve(async (req: Request) => {
         });
 
       if (insertTicketError) {
+        // Detección de colisión concurrente por constraint de base de datos (UNIQUE idx_terminal_enrollment_tickets_single_pending)
+        if (
+          insertTicketError.code === "23505" ||
+          (insertTicketError.message && insertTicketError.message.includes("idx_terminal_enrollment_tickets_single_pending"))
+        ) {
+          return new Response(JSON.stringify({
+            success: false,
+            code: "ENROLLMENT_TICKET_ALREADY_PENDING",
+            error: "Ya existe un ticket de enrolamiento pendiente para esta terminal"
+          }), {
+            status: 409,
+            headers: corsHeaders
+          });
+        }
+
         return new Response(JSON.stringify({ success: false, error: "Error al registrar ticket de enrolamiento" }), {
           status: 500,
           headers: corsHeaders

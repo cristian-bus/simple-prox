@@ -1,4 +1,4 @@
--- KioscoProX / Simple ProX — Script SQL Fase 0.2.1 / 0.2.1a / 0.2.1b
+-- KioscoProX / Simple ProX — Script SQL Fase 0.2.1b (Ajuste Final: Ticket Pending Único)
 -- Proyecto Supabase: qtixbiikhvhzwshfgyeo
 -- Fecha: 23 de Septiembre de 2026
 -- Modo: CAMBIO QUIRÚRGICO — BORRADOR LOCAL — NO EJECUTAR EN PRODUCCIÓN
@@ -55,6 +55,19 @@ CREATE INDEX IF NOT EXISTS idx_terminal_enrollment_tickets_lookup
 
 CREATE INDEX IF NOT EXISTS idx_terminal_enrollment_tickets_expiry 
   ON public.terminal_enrollment_tickets (expires_at);
+
+-- Diagnóstico previo de duplicados (en caso de existir registros previos):
+-- SELECT installation_id, COUNT(*) AS pending_count
+-- FROM public.terminal_enrollment_tickets
+-- WHERE status = 'pending'
+-- GROUP BY installation_id
+-- HAVING COUNT(*) > 1;
+
+-- Índice único parcial (Fase 0.2.1b - Garantía de Ticket Pending Único):
+-- Asegura a nivel de base de datos que jamás coexistan dos tickets en estado 'pending' para el mismo installation_id.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_terminal_enrollment_tickets_single_pending 
+  ON public.terminal_enrollment_tickets (installation_id) 
+  WHERE (status = 'pending');
 
 ALTER TABLE public.terminal_enrollment_tickets ENABLE ROW LEVEL SECURITY;
 
