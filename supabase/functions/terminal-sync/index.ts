@@ -124,12 +124,15 @@ Deno.serve(async (req: Request) => {
             status: 409,
             headers: corsHeaders
           });
+        } else if (existingIdentity.status === "revoked") {
+          // Fase 0.2.1c: Permitir emisión de ticket a terminal revocada si es solicitado por admin verificado
+          // La emisión del ticket por el admin constituye la autorización explícita para el re-enrolamiento.
         } else {
-          // revoked, suspended u otro estado: no emitir ticket de enrolamiento normal
+          // suspended u otro estado: no emitir ticket de enrolamiento normal
           return new Response(JSON.stringify({
             success: false,
             code: "REENROLL_REQUIRES_ADMIN_RESET",
-            error: `La terminal se encuentra en estado '${existingIdentity.status}'. El re-enrolamiento requiere reset administrativo previo.`
+            error: `La terminal se encuentra en estado '${existingIdentity.status}'. El re-enrolamiento requiere revocación administrativa previa.`
           }), {
             status: 409,
             headers: corsHeaders
@@ -218,6 +221,123 @@ Deno.serve(async (req: Request) => {
         enrollmentTicket: rawTicket,
         installationId: targetInstallationId,
         expiresAt
+      }), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // RUTA: /revoke (Revocación Administrativa de Terminal - Fase 0.2.1c)
+    // -------------------------------------------------------------------------
+    if (action === "revoke" && req.method === "POST") {
+      const authHeader = req.headers.get("authorization") || "";
+      const jwt = authHeader.replace(/^Bearer\s+/i, "");
+
+      if (!jwt) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "No autenticado: falta encabezado Authorization Bearer"
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 1. Validar autenticidad del JWT con Supabase Auth
+      const { data: { user }, error: userError } = await adminClient.auth.getUser(jwt);
+      if (userError || !user) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Sesión inválida o expirada"
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 2. Validar privilegios de administrador real (admin_users)
+      const { data: adminRecord, error: adminQueryErr } = await adminClient
+        .from("admin_users")
+        .select("user_id, is_active")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (adminQueryErr || !adminRecord) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Acceso denegado: el usuario autenticado no posee privilegios administrativos autorizados"
+        }), {
+          status: 403,
+          headers: corsHeaders
+        });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const targetInstallationId = String(body.installationId || "").trim();
+      const reason = String(body.reason || "Revocación administrativa por pérdida de credencial").trim().slice(0, 255);
+
+      if (!targetInstallationId || targetInstallationId.length < 3) {
+        return new Response(JSON.stringify({ success: false, error: "installationId inválido" }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      // 3. Verificar que la terminal existe en terminal_identities
+      const { data: targetIdentity, error: identityErr } = await adminClient
+        .from("terminal_identities")
+        .select("installation_id, commerce_id, status")
+        .eq("installation_id", targetInstallationId)
+        .maybeSingle();
+
+      if (identityErr || !targetIdentity) {
+        return new Response(JSON.stringify({
+          success: false,
+          code: "TERMINAL_NOT_FOUND",
+          error: "La terminal indicada no existe en terminal_identities"
+        }), {
+          status: 404,
+          headers: corsHeaders
+        });
+      }
+
+      const nowIso = new Date().toISOString();
+
+      // 4. Actualizar a 'revoked' con timestamps y motivos de auditoría (sin borrar la fila)
+      const { error: updateErr } = await adminClient
+        .from("terminal_identities")
+        .update({
+          status: "revoked",
+          revoked_at: nowIso,
+          revocation_reason: reason
+        })
+        .eq("installation_id", targetInstallationId);
+
+      if (updateErr) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Error al revocar la terminal en base de datos"
+        }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+
+      // 5. Invalidar cualquier ticket pending anterior de esta instalación para evitar carreras
+      await adminClient
+        .from("terminal_enrollment_tickets")
+        .update({ status: "expired" })
+        .eq("installation_id", targetInstallationId)
+        .eq("status", "pending");
+
+      return new Response(JSON.stringify({
+        success: true,
+        installationId: targetInstallationId,
+        status: "revoked",
+        revokedAt: nowIso,
+        revocationReason: reason
       }), {
         status: 200,
         headers: corsHeaders
