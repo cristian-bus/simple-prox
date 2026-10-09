@@ -1,6 +1,6 @@
 import { generateWhatsAppMessage, calculateDiscount, extractB2BMetadata, getCampaignStatus, generateCampaignCode } from '../utils/b2bUtils.js';
-import { enqueueOutbox, flushOutbox } from './syncService.js';
-import { sendTerminalRegister, sendTerminalEvents } from './terminalIdentityService.js';
+import { enqueueOutbox, flushOutbox, getOutbox } from './syncService.js';
+import { sendTerminalRegister } from './terminalIdentityService.js';
 import { APP_VERSION } from '../constants/version.js';
 
 const CACHE_KEYS = {
@@ -328,6 +328,57 @@ export async function registerMerchantRemotely(merchantInfo = {}) {
   }
 }
 
+// Migración segura e idempotente de la cola legacy kioscoprox_pending_events al outbox unificado
+export function migrateLegacyPendingEvents() {
+  if (typeof window === 'undefined' || !window.localStorage) return 0;
+  try {
+    const rawEvents = localStorage.getItem(CACHE_KEYS.PENDING_EVENTS);
+    if (!rawEvents) return 0;
+    const legacyEvents = JSON.parse(rawEvents);
+    if (!Array.isArray(legacyEvents) || legacyEvents.length === 0) {
+      localStorage.removeItem(CACHE_KEYS.PENDING_EVENTS);
+      return 0;
+    }
+
+    const currentOutbox = getOutbox();
+    const existingOutboxEventIds = new Set(
+      currentOutbox
+        .filter(item => item.type === 'CAMPAIGN_EVENT' && item.payload && item.payload.eventId)
+        .map(item => item.payload.eventId)
+    );
+
+    let migratedCount = 0;
+    for (const evt of legacyEvents) {
+      const eventId = evt.eventId || evt.id;
+      if (eventId && !existingOutboxEventIds.has(eventId)) {
+        enqueueOutbox('CAMPAIGN_EVENT', {
+          eventId,
+          campaignId: evt.campaignId,
+          merchantId: evt.merchantId || 'PC-ANONIMO',
+          eventType: evt.eventType,
+          timestamp: evt.timestamp || new Date().toISOString()
+        });
+        existingOutboxEventIds.add(eventId);
+        migratedCount++;
+      }
+    }
+
+    // Limpiar cola legacy únicamente tras completar la incorporación exitosa
+    localStorage.removeItem(CACHE_KEYS.PENDING_EVENTS);
+    return migratedCount;
+  } catch (err) {
+    console.warn('[AdSyncEngine] Error durante migración de cola legacy:', err);
+    return 0;
+  }
+}
+
+// Migración automática al cargar el módulo
+if (typeof window !== 'undefined') {
+  try {
+    migrateLegacyPendingEvents();
+  } catch (e) {}
+}
+
 // Registrar métrica (Impresión, Clic, WhatsApp, Abrir Oferta)
 export function trackAdEvent({ campaignId, merchantId, eventType }) {
   const eventObj = {
@@ -338,29 +389,16 @@ export function trackAdEvent({ campaignId, merchantId, eventType }) {
     timestamp: new Date().toISOString()
   };
 
-  // Guardar en cola local legacy
-  try {
-    const rawEvents = localStorage.getItem(CACHE_KEYS.PENDING_EVENTS);
-    const events = rawEvents ? JSON.parse(rawEvents) : [];
-    events.push(eventObj);
-    localStorage.setItem(CACHE_KEYS.PENDING_EVENTS, JSON.stringify(events));
-  } catch (e) {
-    console.error('[AdSyncEngine] Error guardando métrica:', e);
-  }
-
-  // Encolar en Outbox centralizado
+  // Encolar exclusivamente en Outbox centralizado (eliminada la escritura redundante en PENDING_EVENTS)
   enqueueOutbox('CAMPAIGN_EVENT', eventObj);
 
-  // Sincronizar en segundo plano
-  flushPendingEvents(merchantId);
+  // Sincronizar Outbox en segundo plano
   flushOutbox().catch(() => {});
 
   return eventObj;
 }
 
-let isFlushing = false;
-
-// Enviar lote de métricas pendientes a la nube (Idempotente)
+// Compatibilidad con invocaciones legacy: migra pendientes si hubiese y delega a flushOutbox
 export async function flushPendingEvents(merchantId) {
   if (!navigator.onLine) return;
 
@@ -371,63 +409,8 @@ export async function flushPendingEvents(merchantId) {
     }
   } catch(e) {}
 
-  if (isFlushing) return;
-  isFlushing = true;
-
-  try {
-    const config = getAdConfig();
-    let supabaseUrl = config.supabaseUrl || DEFAULT_SUPABASE_URL;
-    let supabaseKey = config.supabaseKey;
-
-    if (!supabaseKey) {
-      try {
-        const staticCfg = await import('../../public/ad_config.json', { with: { type: 'json' } }).then(m => m.default || m);
-        if (staticCfg.supabaseUrl) supabaseUrl = staticCfg.supabaseUrl;
-        if (staticCfg.supabaseKey) supabaseKey = staticCfg.supabaseKey;
-      } catch (e) {
-        console.warn('No se pudo cargar ad_config.json local', e);
-      }
-    }
-
-    if (!supabaseKey || supabaseKey.includes('...')) return;
-
-    let events = [];
-    try {
-      const rawEvents = localStorage.getItem(CACHE_KEYS.PENDING_EVENTS);
-      events = rawEvents ? JSON.parse(rawEvents) : [];
-    } catch (e) {
-      return;
-    }
-
-    if (events.length === 0) return;
-
-    // Enviar a través del Endpoint Seguro de Terminal
-    try {
-      const payload = events.map(evt => ({
-        eventId: evt.eventId,
-        campaignId: evt.campaignId,
-        eventType: evt.eventType,
-        timestamp: evt.timestamp
-      }));
-
-      const response = await sendTerminalEvents(payload);
-
-      if (response.success) {
-        try {
-          const currentRaw = localStorage.getItem(CACHE_KEYS.PENDING_EVENTS);
-          const currentEvents = currentRaw ? JSON.parse(currentRaw) : [];
-          const syncedEventIds = new Set(events.map(e => e.eventId));
-          const remainingEvents = currentEvents.filter(e => !syncedEventIds.has(e.eventId));
-          localStorage.setItem(CACHE_KEYS.PENDING_EVENTS, JSON.stringify(remainingEvents));
-        } catch(e) {}
-      }
-    } catch (err) {
-      console.warn('[AdSyncEngine] Error al sincronizar métricas con Edge Function:', err);
-    }
-
-  } finally {
-    isFlushing = false;
-  }
+  migrateLegacyPendingEvents();
+  return flushOutbox();
 }
 
 // Generar enlace WhatsApp con mensaje dinámico

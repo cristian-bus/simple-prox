@@ -583,7 +583,10 @@ Deno.serve(async (req: Request) => {
       if (sanitizedEvents.length > 0) {
         const { error: insertError } = await adminClient
           .from("campaign_events")
-          .insert(sanitizedEvents);
+          .upsert(sanitizedEvents, {
+            onConflict: "event_id",
+            ignoreDuplicates: true
+          });
 
         if (insertError) {
           return new Response(JSON.stringify({ success: false, error: "Error al registrar eventos" }), {

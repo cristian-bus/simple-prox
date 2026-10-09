@@ -143,10 +143,16 @@ export async function sendTerminalHeartbeat(payload = {}) {
   if (res.status === 401) {
     // Seguridad: NO borrar el token local automáticamente ante 401 para evitar caer en limbo 409 (Fase 0.2.1)
     console.warn('[TerminalIdentity] HTTP 401: Credencial no autorizada o pendiente de activación.');
-    return { success: false, retryable: false, error: 'Credencial no autorizada' };
+    return { success: false, retryable: false, status: 401, error: 'Credencial no autorizada' };
   }
 
-  return { success: false, retryable: res.status >= 500 || res.status === 429 };
+  const errData = await res.json().catch(() => ({}));
+  return {
+    success: false,
+    retryable: res.status >= 500 || res.status === 429,
+    status: res.status,
+    error: errData.error || errData.code || `Error HTTP ${res.status}`
+  };
 }
 
 /**
@@ -156,7 +162,7 @@ export async function sendTerminalRegister(payload = {}) {
   const token = await getOrEnrollTerminalToken();
   const installationId = getInstallationId();
   if (!token || !installationId) {
-    return { success: false, retryable: true, error: 'Sin credencial de terminal' };
+    return { success: false, retryable: true, status: 0, error: 'Sin credencial de terminal' };
   }
 
   const syncUrl = getTerminalSyncUrl();
@@ -176,10 +182,16 @@ export async function sendTerminalRegister(payload = {}) {
 
   if (res.status === 401) {
     console.warn('[TerminalIdentity] HTTP 401: Credencial no autorizada al registrar comercio.');
-    return { success: false, retryable: false, error: 'Credencial no autorizada' };
+    return { success: false, retryable: false, status: 401, error: 'Credencial no autorizada' };
   }
 
-  return { success: false, retryable: res.status >= 500 || res.status === 429 };
+  const errData = await res.json().catch(() => ({}));
+  return {
+    success: false,
+    retryable: res.status >= 500 || res.status === 429,
+    status: res.status,
+    error: errData.error || errData.code || `Error HTTP ${res.status}`
+  };
 }
 
 /**
@@ -193,7 +205,7 @@ export async function sendTerminalEvents(events = []) {
   const token = await getOrEnrollTerminalToken();
   const installationId = getInstallationId();
   if (!token || !installationId) {
-    return { success: false, retryable: true, error: 'Sin credencial de terminal' };
+    return { success: false, retryable: true, status: 0, error: 'Sin credencial de terminal' };
   }
 
   const syncUrl = getTerminalSyncUrl();
@@ -214,8 +226,14 @@ export async function sendTerminalEvents(events = []) {
 
   if (res.status === 401) {
     console.warn('[TerminalIdentity] HTTP 401: Credencial no autorizada al enviar eventos.');
-    return { success: false, retryable: false, error: 'Credencial no autorizada' };
+    return { success: false, retryable: false, status: 401, error: 'Credencial no autorizada' };
   }
 
-  return { success: false, retryable: res.status >= 500 || res.status === 429 };
+  const errData = await res.json().catch(() => ({}));
+  return {
+    success: false,
+    retryable: res.status >= 500 || res.status === 429,
+    status: res.status,
+    error: errData.error || errData.code || `Error HTTP ${res.status}`
+  };
 }

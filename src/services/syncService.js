@@ -10,6 +10,7 @@ import { sendTerminalEvents, sendTerminalHeartbeat, sendTerminalRegister } from 
 
 const STORAGE_KEYS = {
   OUTBOX: 'kioscoprox_outbox',
+  DEADLETTER: 'kioscoprox_outbox_deadletter',
   LAST_SYNC: 'kioscoprox_last_sync_timestamp'
 };
 
@@ -17,6 +18,52 @@ const DEFAULT_SUPABASE_URL = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
 const MAX_RETRIES = 5;
 let isFlushing = false;
 const listeners = new Set();
+
+/**
+ * Obtener las operaciones archivadas en Dead Letter por fallas permanentes (no reintentables)
+ */
+export function getDeadLetter() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DEADLETTER);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.warn('[SyncService] Error leyendo deadletter:', e);
+    return [];
+  }
+}
+
+/**
+ * Mover ítems fallidos no reintentables o que agotaron reintentos a la cola Dead Letter
+ * Evita la pérdida silenciosa de métricas y datos, sin almacenar secretos.
+ */
+function pushToDeadLetter(items, status, errorMsg) {
+  if (!items || items.length === 0) return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DEADLETTER);
+    const deadletter = raw ? JSON.parse(raw) : [];
+    const nowIso = new Date().toISOString();
+
+    items.forEach(it => {
+      deadletter.push({
+        id: it.id,
+        type: it.type,
+        payload: it.payload,
+        attempts: (it.attempts || 0) + 1,
+        lastAttempt: nowIso,
+        createdAt: it.createdAt || nowIso,
+        status: status || 400,
+        error: errorMsg || 'Error no reintentable',
+        deadLetterAt: nowIso
+      });
+    });
+
+    // Limitar tamaño de deadletter para preservar almacenamiento local (máx 200 ítems)
+    const trimmed = deadletter.slice(-200);
+    localStorage.setItem(STORAGE_KEYS.DEADLETTER, JSON.stringify(trimmed));
+  } catch (e) {
+    console.warn('[SyncService] Error guardando en deadletter:', e);
+  }
+}
 
 /**
  * Obtener las operaciones pendientes en el Outbox
@@ -90,6 +137,7 @@ function notifyOutboxChange(pendingCount) {
  */
 export async function flushOutbox() {
   if (isFlushing) return;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const connected = await checkRealConnectivity();
   if (!connected) return;
 
@@ -101,14 +149,6 @@ export async function flushOutbox() {
     if (items.length === 0) return;
 
     const remaining = [];
-    const config = getAdConfig();
-    const supabaseUrl = (config.supabaseUrl || DEFAULT_SUPABASE_URL).replace(/\/$/, '');
-    const supabaseKey = config.supabaseKey;
-
-    if (!supabaseKey) {
-      isFlushing = false;
-      return;
-    }
 
     // Agrupar eventos de métricas para enviarlos en un único lote eficiente
     const campaignEvents = [];
@@ -140,14 +180,25 @@ export async function flushOutbox() {
           campaignEvents.forEach(it => {
             it.attempts += 1;
             it.lastAttempt = new Date().toISOString();
-            if (it.attempts < MAX_RETRIES) remaining.push(it);
+            if (it.attempts < MAX_RETRIES) {
+              remaining.push(it);
+            } else {
+              pushToDeadLetter([it], result.status || 500, 'Excedido máximo de reintentos');
+            }
           });
+        } else {
+          // Error permanente (4xx): mover a deadletter en vez de descartar silenciosamente
+          pushToDeadLetter(campaignEvents, result.status || 400, result.error || 'Error permanente no reintentable');
         }
       } catch (err) {
         campaignEvents.forEach(it => {
           it.attempts += 1;
           it.lastAttempt = new Date().toISOString();
-          if (it.attempts < MAX_RETRIES) remaining.push(it);
+          if (it.attempts < MAX_RETRIES) {
+            remaining.push(it);
+          } else {
+            pushToDeadLetter([it], 0, 'Excedido máximo de reintentos por error de red');
+          }
         });
       }
     }
@@ -180,15 +231,27 @@ export async function flushOutbox() {
           });
         }
 
-        if (!result.success && result.retryable) {
-          item.attempts += 1;
-          item.lastAttempt = new Date().toISOString();
-          if (item.attempts < MAX_RETRIES) remaining.push(item);
+        if (!result.success) {
+          if (result.retryable) {
+            item.attempts += 1;
+            item.lastAttempt = new Date().toISOString();
+            if (item.attempts < MAX_RETRIES) {
+              remaining.push(item);
+            } else {
+              pushToDeadLetter([item], result.status || 500, 'Excedido máximo de reintentos');
+            }
+          } else {
+            pushToDeadLetter([item], result.status || 400, result.error || 'Error permanente no reintentable');
+          }
         }
       } catch (err) {
         item.attempts += 1;
         item.lastAttempt = new Date().toISOString();
-        if (item.attempts < MAX_RETRIES) remaining.push(item);
+        if (item.attempts < MAX_RETRIES) {
+          remaining.push(item);
+        } else {
+          pushToDeadLetter([item], 0, 'Excedido máximo de reintentos por excepción');
+        }
       }
     }
 
