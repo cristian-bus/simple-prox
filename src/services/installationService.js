@@ -12,47 +12,40 @@ const STORAGE_KEYS = {
   MERCHANT_REGISTRATION: 'kioscoprox_merchant_registration'
 };
 
-const SECRET_SALT = 'KioscoProX_Secret_2026';
 const CURRENT_APP_VERSION = APP_VERSION;
 
 /**
- * Genera una clave de licencia criptográficamente idéntica a la implementación original
+ * Valida de forma local y offline si un certificado Pro es válido para el installationId indicado.
+ * Requiere exclusivamente un certificado digital Ed25519 firmado por el administrador.
+ * 
+ * @param {string} installationId - installationId de la terminal
+ * @param {string} licenseKeyOrToken - Certificado Ed25519 Pro
+ * @returns {Promise<boolean>}
  */
-export function calculateLicenseKey(installationId) {
-  if (!installationId) return '';
-  const cleanId = String(installationId).replace(/^id:\s*/i, '').trim();
-  let hash = 0;
-  const str = cleanId + SECRET_SALT;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
-  return `${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
-}
+export async function isValidProLicense(installationId, licenseKeyOrToken) {
+  if (!installationId || !licenseKeyOrToken) return false;
 
-/**
- * Valida de forma tolerante y retrocompatible si una clave de licencia corresponde al equipo
- */
-export function isValidLicenseKey(installationId, licenseKey) {
-  if (!installationId || !licenseKey) return false;
-  const rawId = String(installationId).trim();
-  const cleanId = rawId.replace(/^id:\s*/i, '').trim();
-  
-  const validKeys = [
-    calculateLicenseKey(rawId),
-    calculateLicenseKey(cleanId),
-    calculateLicenseKey(cleanId.toLowerCase()),
-    calculateLicenseKey(cleanId.toUpperCase())
-  ].filter(Boolean);
+  const str = String(licenseKeyOrToken).trim();
 
-  let entered = String(licenseKey).trim().toUpperCase().replace(/\s+/g, '');
-  if (entered.length === 8 && !entered.includes('-')) {
-    entered = `${entered.slice(0, 4)}-${entered.slice(4, 8)}`;
+  // En entorno de desarrollo (exclusivo import.meta.env.DEV, eliminado por dead-code en build de producción)
+  if (import.meta.env.DEV && str === 'DEV_SIMULATED_PRO_LICENSE') {
+    return true;
   }
 
-  return validKeys.some(k => k.toUpperCase() === entered);
+  // Las licencias Pro legítimas son certificados digitales Ed25519 (Base64.Base64)
+  if (str.includes('.')) {
+    try {
+      const { verifyProLicenseCertificate } = await import('../utils/licenseCrypto.js');
+      const res = await verifyProLicenseCertificate(str, installationId);
+      return res.valid === true;
+    } catch (e) {
+      console.error('[InstallationService] Error verificando certificado Pro Ed25519:', e);
+      return false;
+    }
+  }
+
+  // Cualquier formato sin firma digital asimétrica (incluyendo claves legadas) es rechazado
+  return false;
 }
 
 /**

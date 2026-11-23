@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Shield, KeyRound, Building2, MapPin, Phone, UserCheck, AlertCircle, CheckCircle2, Loader2, Settings } from 'lucide-react';
-import { processActivation } from '../services/activationService';
+import { Shield, KeyRound, Building2, MapPin, Phone, UserCheck, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { registerMerchantRemotely } from '../services/adSyncEngine';
+import { verifyBasicActivationCertificate } from '../utils/licenseCrypto';
+import { processActivation } from '../services/activationService';
+import { getInstallationId } from '../services/installationService';
 import { APP_VERSION } from '../constants/version';
 
 export default function ActivationGuard({ kiosco, onActivated }) {
@@ -15,31 +17,6 @@ export default function ActivationGuard({ kiosco, onActivated }) {
   const isSubmittingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  // Modal para configurar Servidor / Clave Maestra
-  const [showConfigModal, setShowConfigModal] = useState(false);
-
-  const [remoteUrl, setRemoteUrl] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.remoteConfigUrl || '';
-  });
-  const [localMasterKey, setLocalMasterKey] = useState(() => {
-    const config = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    return config.masterKey || '';
-  });
-
-  const handleSaveConfig = () => {
-    const existing = JSON.parse(localStorage.getItem('kioscoprox_remote_config') || '{}');
-    const newConfig = {
-      ...existing,
-      remoteConfigUrl: remoteUrl.trim(),
-      masterKey: localMasterKey.trim()
-    };
-    delete newConfig.telegramBotToken;
-    delete newConfig.telegramChatId;
-    localStorage.setItem('kioscoprox_remote_config', JSON.stringify(newConfig));
-    setShowConfigModal(false);
-  };
 
   const handleActivate = async (e) => {
     e.preventDefault();
@@ -61,7 +38,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
       return;
     }
     if (!masterKeyInput.trim()) {
-      setErrorMsg('Ingresa la Clave Maestra de Activación.');
+      setErrorMsg('Ingresa la Clave Maestra de activación.');
       return;
     }
 
@@ -69,24 +46,40 @@ export default function ActivationGuard({ kiosco, onActivated }) {
     setLoading(true);
 
     try {
-      const res = await processActivation({
+      // Obtener o preservar el installationId exacto
+      const effectiveId = kiosco?.businessConfig?.installationId || getInstallationId();
+
+      // Solicitar activación remota con Clave Maestra a la Edge Function
+      const activationRes = await processActivation({
         negocio: negocio.trim(),
         direccion: direccion.trim(),
         telefono: telefono.trim(),
         instalador: instalador.trim(),
         masterKeyInput: masterKeyInput.trim(),
+        installationId: effectiveId,
         version: APP_VERSION
       });
 
-      if (!res.success) {
+      if (!activationRes.success) {
         isSubmittingRef.current = false;
-        setErrorMsg(res.error || 'La Clave Maestra es incorrecta.');
+        setErrorMsg(activationRes.error || 'Error al autorizar la activación del equipo.');
         setLoading(false);
         return;
       }
 
-      const effectiveId = kiosco.businessConfig?.installationId || Math.random().toString(36).substring(2, 10).toUpperCase();
+      const receivedToken = activationRes.token;
 
+      // Verificar local y criptográficamente el certificado básico recibido antes de guardar
+      const verifyRes = await verifyBasicActivationCertificate(receivedToken, effectiveId);
+
+      if (!verifyRes.valid) {
+        isSubmittingRef.current = false;
+        setErrorMsg(verifyRes.error || 'El certificado digital recibido del servidor no es válido.');
+        setLoading(false);
+        return;
+      }
+
+      // Preparar payload de activación sin guardar la clave maestra
       const activationPayload = {
         isActivated: true,
         activatedAt: new Date().toISOString(),
@@ -94,7 +87,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
         direccion: direccion.trim(),
         telefono: telefono.trim(),
         instalador: instalador.trim(),
-        hardwareId: res.installationData.hardwareId
+        hardwareId: verifyRes.payload?.installationData?.hardwareId || ('PC-' + Math.random().toString(36).substring(2, 9).toUpperCase())
       };
 
       const updatedConfig = {
@@ -105,9 +98,22 @@ export default function ActivationGuard({ kiosco, onActivated }) {
         address: direccion.trim(),
         phone: telefono.trim(),
         isActivated: true,
-        plan: kiosco.businessConfig?.plan || 'Básico',
+        plan: 'Básico', // Siempre inicia en Plan Básico garantizado
         activationData: activationPayload
       };
+
+      // Guardar el token firmado digitalmente en localStorage para verificaciones offline futuras
+      localStorage.setItem('kioscoprox_license_token', receivedToken);
+
+      // Si el servidor aprovisionó credencial de terminal para telemetría, guardarla de forma segura
+      if (activationRes.terminalToken) {
+        try {
+          const { storeTerminalToken } = await import('../services/terminalIdentityService');
+          await storeTerminalToken(activationRes.terminalToken);
+        } catch (tokenErr) {
+          console.warn('[ActivationGuard] Advertencia al guardar credencial de terminal:', tokenErr);
+        }
+      }
 
       // Guardar síncronamente en localStorage de inmediato
       try {
@@ -115,12 +121,12 @@ export default function ActivationGuard({ kiosco, onActivated }) {
         localStorage.setItem('kioscoprox_merchant_registration', JSON.stringify({
           installationId: effectiveId,
           storeName: negocio.trim(),
-          plan: kiosco.businessConfig?.plan || 'Básico',
+          plan: 'Básico',
           address: direccion.trim(),
           phone: telefono.trim(),
           installer: instalador.trim(),
-          city: res.installationData.geo?.city || '',
-          ip: res.installationData.geo?.ip || '',
+          city: verifyRes.payload?.installationData?.geo?.city || '',
+          ip: verifyRes.payload?.installationData?.geo?.ip || '',
           appVersion: APP_VERSION,
           lastActive: new Date().toISOString()
         }));
@@ -128,24 +134,26 @@ export default function ActivationGuard({ kiosco, onActivated }) {
 
       kiosco.updateBusinessConfig(updatedConfig);
 
-      // Registrar inmediatamente en Supabase con todos los datos recibidos (esperando para garantizar envío)
+      // Registrar asíncronamente en Supabase para el panel admin
       try {
         await registerMerchantRemotely({
           installationId: effectiveId,
           storeName: negocio.trim(),
-          plan: kiosco.businessConfig?.plan || 'Básico',
+          plan: 'Básico',
           address: direccion.trim(),
           phone: telefono.trim(),
           installer: instalador.trim(),
-          city: res.installationData.geo?.city || '',
-          ip: res.installationData.geo?.ip || '',
+          city: verifyRes.payload?.installationData?.geo?.city || '',
+          ip: verifyRes.payload?.installationData?.geo?.ip || '',
           appVersion: APP_VERSION
         });
       } catch(err) {
         console.warn('[ActivationGuard] Advertencia al sincronizar con Supabase:', err);
       }
 
-      setSuccessMsg('¡Licencia activada con éxito! Notificación enviada.');
+      // Limpiar input de clave maestra de la memoria del componente
+      setMasterKeyInput('');
+      setSuccessMsg('¡Equipo activado con éxito en Plan Básico! Iniciando sistema...');
 
       setTimeout(() => {
         if (onActivated) onActivated();
@@ -153,7 +161,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
 
     } catch (err) {
       isSubmittingRef.current = false;
-      setErrorMsg('Error al conectar con el servicio de verificación. Verifica tu conexión a internet.');
+      setErrorMsg('Error durante el proceso de activación. Verifique su conexión.');
     } finally {
       setLoading(false);
     }
@@ -351,9 +359,10 @@ export default function ActivationGuard({ kiosco, onActivated }) {
               <KeyRound size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#3b82f6' }} />
               <input
                 type="password"
-                placeholder="••••••••••••"
+                placeholder="Ingresa la clave maestra del administrador..."
                 value={masterKeyInput}
                 onChange={e => setMasterKeyInput(e.target.value)}
+                autoComplete="off"
                 style={{
                   width: '100%',
                   padding: '12px 14px 12px 42px',
@@ -362,7 +371,7 @@ export default function ActivationGuard({ kiosco, onActivated }) {
                   borderRadius: '10px',
                   color: '#ffffff',
                   fontSize: '15px',
-                  letterSpacing: '2px',
+                  letterSpacing: '1px',
                   outline: 'none'
                 }}
               />
@@ -394,88 +403,53 @@ export default function ActivationGuard({ kiosco, onActivated }) {
             {loading ? (
               <>
                 <Loader2 size={20} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Verificando Clave en Nube...</span>
+                <span>Activando en el servidor...</span>
               </>
             ) : (
-              <span>Activar Licencia del Sistema</span>
+              <span>Activar Terminal en Plan Básico</span>
             )}
           </button>
         </form>
-      </div>
 
-      {/* Modal de Configuración de Servidor Nube y Clave Maestra */}
-      {showConfigModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.75)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px'
-        }}>
+        {import.meta.env.DEV && (
           <div style={{
-            width: '100%',
-            maxWidth: '480px',
-            backgroundColor: '#1e293b',
-            borderRadius: '16px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            padding: '28px',
-            color: '#f8fafc'
+            marginTop: '24px',
+            paddingTop: '20px',
+            borderTop: '1px dashed rgba(255, 255, 255, 0.15)',
+            textAlign: 'center'
           }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0', color: '#ffffff' }}>
-              Configuración de Autorización y Clave
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px' }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', color: '#cbd5e1' }}>
-                  URL de Validación / Configuración Remota (Opcional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://... o endpoint de configuración"
-                  value={remoteUrl}
-                  onChange={e => setRemoteUrl(e.target.value)}
-                  style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', color: '#cbd5e1' }}>
-                  Clave Maestra de Activación para este Terminal:
-                </label>
-                <input
-                  type="password"
-                  placeholder="Ingresa la clave maestra autorizada"
-                  value={localMasterKey}
-                  onChange={e => setLocalMasterKey(e.target.value)}
-                  style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                />
-              </div>
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '10px' }}>
+              🛠️ Entorno de Desarrollo Aislado (Solo Dev)
             </div>
-
-            <div style={{ display: 'flex', gap: '8px', marginTop: '20px', justifyContent: 'flex-end', alignItems: 'center' }}>
-              <button
-                onClick={() => setShowConfigModal(false)}
-                style={{ padding: '9px 14px', backgroundColor: 'transparent', border: '1px solid #475569', borderRadius: '8px', color: '#cbd5e1', cursor: 'pointer', fontSize: '13px' }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveConfig}
-                style={{ padding: '9px 16px', backgroundColor: '#2563eb', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
-              >
-                Guardar
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const { startLocalDemo } = await import('../utils/devDemoMode.js');
+                startLocalDemo();
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: 'rgba(124, 58, 237, 0.15)',
+                border: '1px solid #7c3aed',
+                borderRadius: '12px',
+                color: '#c4b5fd',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <span>🧪 Probar Demo Local (Sin Licencia ni Supabase)</span>
+            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
+
