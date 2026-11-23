@@ -123,7 +123,7 @@ const Inventario = ({ kiosco, ofertas }) => {
   };
 
   const lowStockCount = products.filter(p => p.isActive && !p.isCombo && Number(p.stock) <= (p.stockAlert !== undefined && p.stockAlert !== '' ? Number(p.stockAlert) : 5) && Number(p.stock) > 0).length;
-  const outOfStockCount = products.filter(p => p.isActive && !p.isCombo && p.stock === 0).length;
+  const outOfStockCount = products.filter(p => p.isActive && !p.isCombo && !p.isService && Number(p.stock) <= 0).length;
   const totalInvestment = products.filter(p => !p.isCombo).reduce((acc, p) => acc + ((parseFloat(p.cost) || parseFloat(p.priceNet) * 0.7 || 0) * (p.stock || 0)), 0);
   const productsWithStock = products.filter(p => !p.isCombo && (p.stock || 0) > 0).length;
 

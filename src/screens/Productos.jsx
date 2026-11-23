@@ -456,6 +456,7 @@ const Productos = ({ kiosco }) => {
   const [filterType, setFilterType] = useState('Todos'); // 'Todos' | 'Productos' | 'Combos'
   const [filterMarca, setFilterMarca] = useState('Todas');
   const [productToDelete, setProductToDelete] = useState(null);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -499,15 +500,18 @@ const Productos = ({ kiosco }) => {
       const newData = { ...prev, [field]: value };
       if (field === 'margin' || field === 'cost') {
         const cost = parseFloat(newData.cost);
-        const margin = parseFloat(newData.margin) || 0;
-        newData.priceFinal = isNaN(cost) ? '' : (cost * (1 + margin / 100)).toFixed(2);
-      } else if (field === 'priceFinal') {
-        const final = parseFloat(newData.priceFinal);
-        const cost = parseFloat(newData.cost);
-        if (!isNaN(final) && !isNaN(cost) && cost > 0) {
-           newData.margin = (((final / cost) - 1) * 100).toFixed(2);
+        if (isNaN(cost) || !isFinite(cost) || cost <= 0) {
+          newData.priceFinal = '';
+        } else if (newData.margin === '' || newData.margin === undefined) {
+          newData.priceFinal = '';
         } else {
-           newData.margin = '';
+          const margin = parseFloat(newData.margin);
+          if (isNaN(margin) || !isFinite(margin)) {
+            newData.priceFinal = '';
+          } else {
+            const calculated = cost * (1 + margin / 100);
+            newData.priceFinal = (isFinite(calculated) && calculated >= 0) ? calculated.toFixed(2) : '';
+          }
         }
       }
       return newData;
@@ -515,11 +519,15 @@ const Productos = ({ kiosco }) => {
   };
 
   useEffect(() => {
-    const hasValidComponent = comboData.components.some(c => c.productId);
-    if (!hasValidComponent) return;
+    const validComps = (comboData.components || []).filter(c => c && c.productId);
+    if (validComps.length === 0) {
+      if (comboData.cost && comboData.cost !== '0.00' && comboData.cost !== '0') {
+        setComboData(prev => ({ ...prev, cost: '', priceFinal: '' }));
+      }
+      return;
+    }
 
-    const newCost = comboData.components.reduce((acc, comp) => {
-      if (!comp.productId) return acc;
+    const newCost = validComps.reduce((acc, comp) => {
       const prod = products.find(p => p.id === comp.productId || p.id === comp.productId.toString());
       if (!prod || !prod.cost) return acc;
       return acc + (parseFloat(prod.cost) * parseFloat(comp.qty || 1));
@@ -529,7 +537,7 @@ const Productos = ({ kiosco }) => {
     const currentCost = parseFloat(comboData.cost || 0).toFixed(2);
     const calculatedCost = newCost.toFixed(2);
     
-    if (calculatedCost !== currentCost && newCost > 0) {
+    if (calculatedCost !== currentCost) {
       handleComboInputChange('cost', calculatedCost);
     }
   }, [comboData.components, products]);
@@ -560,8 +568,34 @@ const Productos = ({ kiosco }) => {
   };
 
   const handleSaveCombo = () => {
-    if (!comboData.name || !comboData.sku || comboData.components.length === 0) {
-      setAlertMessage("Por favor completa el nombre, el código/SKU y selecciona al menos un producto.");
+    const validComponents = (comboData.components || []).filter(
+      c => c && c.productId && String(c.productId).trim() !== ''
+    );
+
+    if (!comboData.name || !comboData.sku || validComponents.length === 0) {
+      setAlertMessage("Por favor completa el nombre, el código/SKU y selecciona al menos un producto componente válido.");
+      setShowAlert(true);
+      return;
+    }
+
+    const totalCost = parseFloat(comboData.cost);
+    const margin = parseFloat(comboData.margin);
+    const finalPrice = parseFloat(comboData.priceFinal);
+
+    if (isNaN(totalCost) || !isFinite(totalCost) || totalCost <= 0) {
+      setAlertMessage("El costo total del combo debe ser mayor a 0 para calcular el precio de venta.");
+      setShowAlert(true);
+      return;
+    }
+
+    if (isNaN(margin) || !isFinite(margin)) {
+      setAlertMessage("Por favor ingresá un porcentaje de ganancia numérico válido.");
+      setShowAlert(true);
+      return;
+    }
+
+    if (isNaN(finalPrice) || !isFinite(finalPrice) || finalPrice <= 0) {
+      setAlertMessage("El precio de venta calculado no es válido. Por favor verificá el costo y el porcentaje de ganancia.");
       setShowAlert(true);
       return;
     }
@@ -600,14 +634,14 @@ const Productos = ({ kiosco }) => {
     
     const newCombo = {
       ...comboData,
-      price: parseFloat(comboData.priceFinal) || 0,
+      components: validComponents,
+      price: finalPrice,
       code: comboData.sku,
       category: comboData.category,
       subcategory: comboData.subcategory,
       isCombo: true,
       stock: parseFloat(comboData.stock) || 0,
       stockAlert: parseFloat(comboData.stockAlert) || 5
-
     };
 
     if (editingId) {
@@ -616,21 +650,7 @@ const Productos = ({ kiosco }) => {
       saveProduct(newCombo);
     }
     
-    setEditingId(null);
-    setComboData({
-      name: '',
-      sku: '',
-      category: '🍞 Alimentos',
-      subcategory: 'Panificados',
-      isActive: true,
-      margin: '',
-      cost: '',
-      priceFinal: '',
-      stock: '',
-      stockAlert: '',
-      components: [{ id: Date.now(), productId: '', qty: 1 }]
-    });
-    
+    resetComboForm();
     setView('list');
   };
 
@@ -806,8 +826,14 @@ const Productos = ({ kiosco }) => {
     const originalProduct = editingId ? products.find(p => p.id === editingId) : null;
     const isNewDate = originalProduct ? (formData.expirationDate !== (originalProduct.expirationDate || '')) : true;
 
+    // Descartar filas vacías de insumos en servicios sin alterar componentes válidos
+    const cleanComponents = formData.isService
+      ? (formData.components || []).filter(c => c && c.productId && String(c.productId).trim() !== '')
+      : (formData.components || []);
+
     const productData = {
       ...formData,
+      components: cleanComponents,
       price: parseFloat(formData.priceFinal) || 0,
       code: formData.sku,
       category: formData.category,
@@ -827,8 +853,26 @@ const Productos = ({ kiosco }) => {
     setView('list');
   };
 
+  const resetComboForm = () => {
+    setEditingId(null);
+    setComboData({
+      name: '',
+      sku: '',
+      category: '🍞 Alimentos',
+      subcategory: 'Panificados',
+      isActive: true,
+      margin: '',
+      cost: '',
+      priceFinal: '',
+      stock: '',
+      stockAlert: '',
+      components: [{ id: Date.now(), productId: '', qty: 1 }]
+    });
+  };
+
   const resetForm = () => {
     setEditingId(null);
+    resetComboForm();
     setFormData({
       name: '',
       sku: '',
@@ -1365,11 +1409,7 @@ const Productos = ({ kiosco }) => {
                       <button className="btn-icon" onClick={() => handleStartEditCategory(cat)} title="Editar nombre o emoticón">
                         <Edit2 size={14} />
                       </button>
-                      <button className="btn-icon" style={{ color: '#dc3545' }} onClick={() => {
-                        const newTree = { ...categoryTree };
-                        delete newTree[cat];
-                        updateCategoryTree(newTree);
-                      }} title="Eliminar categoría">
+                      <button className="btn-icon" style={{ color: '#dc3545' }} onClick={() => setCategoryToDelete(cat)} title="Eliminar categoría">
                         <Trash2 size={14} />
                       </button>
                       <button className="btn-icon" onClick={() => setSelectedCatForSubs(selectedCatForSubs === cat ? null : cat)} title="Gestionar subcategorías">
@@ -1451,6 +1491,58 @@ const Productos = ({ kiosco }) => {
             <button className="btn btn-primary" style={{ flex: 1, padding: '12px', borderRadius: '8px', fontWeight: 600, backgroundColor: '#ea4335', border: 'none' }} onClick={() => { deleteProduct(productToDelete.id); setProductToDelete(null); }}>
               Sí, eliminar
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCategoryDeleteOverlay = () => {
+    if (!categoryToDelete) return null;
+    const associatedCount = products.filter(p => p.category === categoryToDelete).length;
+    const hasAssociated = associatedCount > 0;
+
+    return (
+      <div className="modal-overlay" onClick={() => setCategoryToDelete(null)} style={{ zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '420px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '24px', animation: 'scaleIn 0.2s ease-out' }}>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: hasAssociated ? 'rgba(234, 179, 8, 0.15)' : 'rgba(234, 67, 53, 0.1)', marginBottom: '16px' }}>
+              {hasAssociated ? <AlertTriangle size={28} color="#d97706" /> : <Trash2 size={28} color="#ea4335" />}
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 8px 0', color: '#1a1f36' }}>
+              ¿Estás seguro de que querés eliminar esta categoría?
+            </h3>
+            <p style={{ color: 'var(--color-text-main)', fontSize: '15px', fontWeight: 600, margin: '0 0 12px 0' }}>
+              "{categoryToDelete}"
+            </p>
+            {hasAssociated ? (
+              <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#92400e', textAlign: 'left', lineHeight: '1.5' }}>
+                <strong>No se puede eliminar:</strong> Esta categoría tiene <strong>{associatedCount} producto(s)</strong> asociado(s). Para poder eliminarla, deben reasignarse a otra categoría.
+              </div>
+            ) : (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: '1.5', margin: 0 }}>
+                Esta acción eliminará la categoría del catálogo. No se puede deshacer.
+              </p>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="btn btn-outline" style={{ flex: 1, padding: '12px', borderRadius: '8px', fontWeight: 600 }} onClick={() => setCategoryToDelete(null)}>
+              Cancelar
+            </button>
+            {!hasAssociated && (
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', fontWeight: 600, backgroundColor: '#ea4335', border: 'none' }}
+                onClick={() => {
+                  const newTree = { ...categoryTree };
+                  delete newTree[categoryToDelete];
+                  updateCategoryTree(newTree);
+                  setCategoryToDelete(null);
+                }}
+              >
+                Eliminar
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1610,7 +1702,7 @@ const Productos = ({ kiosco }) => {
   const renderCreateComboModal = () => {
     if (view !== 'createCombo') return null;
     return (
-      <Modal title="Agregar combo" onClose={() => setView('list')} minWidth="700px">
+      <Modal title={editingId ? "Editar Combo" : "Agregar Combo"} onClose={() => { setView('list'); resetComboForm(); }} minWidth="700px">
         <div style={{ padding: '0 8px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
             <div>
@@ -1658,7 +1750,17 @@ const Productos = ({ kiosco }) => {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>PRECIO VENTA ($)</label>
-<input type="text" inputMode="decimal" className="input" placeholder="Lo que cobrás" value={comboData.priceFinal} onChange={e => handleComboInputChange('priceFinal', e.target.value)} step="0.01" onFocus={e => e.target.select()} style={{ padding: '12px', borderRadius: '8px', width: '100%' }} />
+                <input 
+                  type="text" 
+                  className="input" 
+                  placeholder="Automático" 
+                  value={comboData.priceFinal} 
+                  disabled 
+                  readOnly 
+                  title="El precio de venta se calcula automáticamente a partir del costo y el porcentaje de ganancia" 
+                  style={{ padding: '12px', borderRadius: '8px', width: '100%', backgroundColor: '#f1f3f5', color: '#495057', cursor: 'not-allowed', fontWeight: 600 }} 
+                />
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '6px' }}>Calculado automáticamente según ganancia</div>
               </div>
             </div>
 
@@ -1702,7 +1804,7 @@ const Productos = ({ kiosco }) => {
           </div>
 
           <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button className="btn btn-outline" style={{ padding: '12px 24px', fontWeight: 600, borderRadius: '8px' }} onClick={() => setView('list')}>Cancelar</button>
+            <button className="btn btn-outline" style={{ padding: '12px 24px', fontWeight: 600, borderRadius: '8px' }} onClick={() => { setView('list'); resetComboForm(); }}>Cancelar</button>
             <button className="btn btn-primary" style={{ padding: '12px 32px', fontWeight: 600, borderRadius: '8px', backgroundColor: '#f97316', borderColor: '#f97316' }} onClick={handleSaveCombo}>
                Guardar
             </button>
@@ -1969,6 +2071,7 @@ const Productos = ({ kiosco }) => {
                 setAlertMessage("La creación de Combos y Packs es una función exclusiva del Plan Pro. Ve a Configuración para actualizar tu plan.");
                 setShowAlert(true);
               } else {
+                resetComboForm();
                 setView('createCombo');
               }
             }}>
@@ -2216,6 +2319,7 @@ const Productos = ({ kiosco }) => {
         </Modal>
       )}
       {renderProductDeleteOverlay()}
+      {renderCategoryDeleteOverlay()}
       {renderCategoryModal()}
       {renderMappingModal()}
       {renderImportModal()}
