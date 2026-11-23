@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Copy, Percent, Save, Check, Calendar, Send, Bell, RefreshCw, Key, DownloadCloud, Wifi, WifiOff } from 'lucide-react';
-import { generateLicenseKey, isValidLicenseKey } from '../hooks/useKiosco';
+import { Crown, Copy, Percent, Save, Check, Calendar, Send, Bell, RefreshCw, Key, DownloadCloud, UploadCloud, Wifi, WifiOff, HardDrive, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { isValidProLicense } from '../hooks/useKiosco';
 import { generate5MonthsDemoData } from '../utils/demoDataGenerator';
 import { registerMerchantRemotely } from '../services/adSyncEngine';
 import { ARGENTINA_PROVINCES, getCitiesForProvince } from '../utils/argentinaGeo';
 import { getCommerceProfile, saveCommerceProfile } from '../services/installationService';
 import { subscribeUpdate, checkForUpdatesManual, applyUpdateSafe, UPDATE_STATUS } from '../services/updateService';
 import { subscribeConnectivity, CONNECTIVITY_STATUS } from '../services/connectivityService';
+import { exportBackupToFile, verifyBackupIntegrity, restoreCommercialBackup } from '../services/backupService.js';
 import { APP_VERSION } from '../constants/version';
 
 const Configuracion = ({ kiosco }) => {
@@ -42,8 +43,12 @@ const Configuracion = ({ kiosco }) => {
   
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
   const [licenseError, setLicenseError] = useState('');
-  const [generatorInput, setGeneratorInput] = useState('');
-  const [generatedKey, setGeneratedKey] = useState('');
+  const [isValidatingLicense, setIsValidatingLicense] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restorePreview, setRestorePreview] = useState(null);
+  const [freshInstallAdminPin, setFreshInstallAdminPin] = useState('');
 
   const [globalMargin, setGlobalMargin] = useState('');
   
@@ -92,37 +97,50 @@ const Configuracion = ({ kiosco }) => {
     );
   };
 
-  const handleActivateLicense = () => {
+  const handleActivateLicense = async () => {
     const rawId = kiosco.businessConfig?.installationId;
-    let inputKey = licenseKeyInput.trim().toUpperCase().replace(/\s+/g, '');
-    if (inputKey.length === 8 && !inputKey.includes('-')) {
-      inputKey = `${inputKey.slice(0, 4)}-${inputKey.slice(4, 8)}`;
+    const inputToken = licenseKeyInput.trim();
+
+    if (!inputToken) {
+      setLicenseError('Por favor ingresá el certificado digital Pro.');
+      return;
     }
 
-    if (isValidLicenseKey(rawId, inputKey)) {
-      const canonical = generateLicenseKey(rawId);
-      kiosco.updateBusinessConfig({
-        ...kiosco.businessConfig,
-        plan: 'Pro',
-        licenseKey: inputKey || canonical
-      });
+    setIsValidatingLicense(true);
+    setLicenseError('');
 
-      // Sincronizar inmediatamente a Supabase para reflejar Plan Pro en el panel admin
-      registerMerchantRemotely({
-        installationId: kiosco.businessConfig?.installationId,
-        storeName: kiosco.businessConfig?.storeName || kiosco.businessConfig?.name,
-        plan: 'Pro',
-        address: kiosco.businessConfig?.address || kiosco.businessConfig?.activationData?.direccion || '',
-        phone: kiosco.businessConfig?.phone || kiosco.businessConfig?.activationData?.telefono || '',
-        installer: kiosco.businessConfig?.activationData?.instalador || '',
-        appVersion: APP_VERSION
-      }).catch(err => console.warn('Error actualizando plan Pro en Supabase:', err));
+    try {
+      const isValid = await isValidProLicense(rawId, inputToken);
 
-      setLicenseKeyInput('');
-      setLicenseError('');
-      showAlertModal('Licencia Activada', '¡Licencia Pro activada exitosamente!');
-    } else {
-      setLicenseError('La clave ingresada no es válida para este equipo.');
+      if (isValid) {
+        kiosco.updateBusinessConfig({
+          ...kiosco.businessConfig,
+          plan: 'Pro',
+          licenseKey: inputToken
+        });
+
+        // Sincronizar inmediatamente a Supabase para reflejar Plan Pro en el panel admin (no bloqueante)
+        registerMerchantRemotely({
+          installationId: kiosco.businessConfig?.installationId,
+          storeName: kiosco.businessConfig?.storeName || kiosco.businessConfig?.name,
+          plan: 'Pro',
+          address: kiosco.businessConfig?.address || kiosco.businessConfig?.activationData?.direccion || '',
+          phone: kiosco.businessConfig?.phone || kiosco.businessConfig?.activationData?.telefono || '',
+          installer: kiosco.businessConfig?.activationData?.instalador || '',
+          appVersion: APP_VERSION
+        }).catch(err => console.warn('Error actualizando plan Pro en Supabase:', err));
+
+        setLicenseKeyInput('');
+        setLicenseError('');
+        showAlertModal('Licencia Activada', '¡Licencia Pro permanente activada exitosamente!');
+      } else {
+        setLicenseError('El certificado ingresado no es válido para este equipo.');
+      }
+    } catch (err) {
+      console.error('Error al activar licencia Pro:', err);
+      setLicenseError('Ocurrió un error al verificar el certificado.');
+    } finally {
+      setIsValidatingLicense(false);
     }
   };
 
@@ -133,6 +151,146 @@ const Configuracion = ({ kiosco }) => {
         setCopiedId(true);
         setTimeout(() => setCopiedId(false), 2000);
       });
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      const res = await exportBackupToFile(kiosco);
+      if (res.canceled) {
+        return; // Operación cancelada por el usuario en el diálogo nativo
+      }
+      if (res.success) {
+        const counts = res.summary || {};
+        const detailMsg = `Copia de seguridad generada con éxito.\n\n` +
+          `• Productos: ${counts.productsCount || 0}\n` +
+          `• Ventas: ${counts.salesCount || 0}\n` +
+          `• Clientes: ${counts.clientsCount || 0}\n` +
+          `• Compras: ${counts.purchasesCount || 0}\n` +
+          `• Turnos de caja: ${counts.shiftsCount || 0}\n\n` +
+          (res.filePath ? `Archivo: ${res.filePath}` : '');
+        showAlertModal('Copia de Seguridad Completada', detailMsg);
+      } else {
+        showAlertModal('Error al Guardar', res.error || 'No se pudo generar el archivo de respaldo.');
+      }
+    } catch (err) {
+      console.error('[Configuracion] Error al crear respaldo:', err);
+      showAlertModal('Error Inesperado', 'Ocurrió un error al procesar la copia de seguridad.');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleSelectRestoreFile = async () => {
+    setIsRestoring(true);
+    try {
+      // 1. Entorno Electron: Abrir diálogo nativo
+      if (typeof window !== 'undefined' && window.api && typeof window.api.readBackupFile === 'function') {
+        const res = await window.api.readBackupFile();
+        if (res.canceled) {
+          setIsRestoring(false);
+          return;
+        }
+        if (!res.success || !res.fileContent) {
+          showAlertModal('Error al Abrir', res.error || 'No se pudo leer el archivo seleccionado.');
+          setIsRestoring(false);
+          return;
+        }
+        await processRestoreContent(res.fileContent, res.filePath);
+        return;
+      }
+
+      // 2. Fallback de navegador / desarrollo
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.spx,.json';
+      input.onchange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) {
+          setIsRestoring(false);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          await processRestoreContent(evt.target.result, file.name);
+        };
+        reader.onerror = () => {
+          showAlertModal('Error al Leer', 'No se pudo leer el archivo seleccionado.');
+          setIsRestoring(false);
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    } catch (err) {
+      console.error('[Configuracion] Error al seleccionar archivo de restauración:', err);
+      showAlertModal('Error Inesperado', 'Ocurrió un error al procesar el archivo.');
+      setIsRestoring(false);
+    }
+  };
+
+  const processRestoreContent = async (contentStr, filePath) => {
+    try {
+      const integrity = await verifyBackupIntegrity(contentStr);
+      if (!integrity.valid) {
+        showAlertModal('Archivo Inválido o Dañado', integrity.error || 'La comprobación de integridad SHA-256 falló.');
+        setIsRestoring(false);
+        return;
+      }
+
+      const payload = typeof contentStr === 'string' ? JSON.parse(contentStr) : contentStr;
+      setRestorePreview({
+        filePath,
+        storeName: payload.storeName || 'Comercio',
+        createdAt: payload.createdAt,
+        summary: payload.summary || {},
+        payload
+      });
+      setShowRestoreModal(true);
+    } catch (err) {
+      showAlertModal('Archivo Corrupto', 'El archivo no tiene un formato JSON válido.');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restorePreview || !restorePreview.payload) return;
+
+    const currentUsers = Array.isArray(kiosco.users) ? kiosco.users : [];
+    const hasAdmin = currentUsers.some(u => u.role === 'Admin' && u.pin);
+    if (!hasAdmin && (!freshInstallAdminPin || freshInstallAdminPin.length < 4)) {
+      showAlertModal('PIN Requerido', 'Para una instalación nueva, debes ingresar un PIN de 4 dígitos para el Administrador.');
+      return;
+    }
+
+    setIsRestoring(true);
+    setShowRestoreModal(false);
+
+    try {
+      const res = await restoreCommercialBackup({
+        backup: restorePreview.payload,
+        adminPinFallback: freshInstallAdminPin
+      });
+
+      if (res.success) {
+        showAlertModal(
+          '¡Restauración Exitosa!',
+          'Se han restaurado correctamente los datos comerciales y se verificó la integridad del sistema.\n\nLa aplicación se reiniciará para cargar los nuevos datos.'
+        );
+        setTimeout(() => {
+          if (typeof window !== 'undefined' && window.location) {
+            window.location.reload();
+          }
+        }, 2200);
+      } else {
+        showAlertModal('Fallo en la Restauración', res.error || 'Ocurrió un error al aplicar los datos.');
+        setIsRestoring(false);
+      }
+    } catch (err) {
+      console.error('[Configuracion] Error al ejecutar restauración:', err);
+      showAlertModal('Error Crítico', 'Ocurrió un error al restaurar los datos.');
+      setIsRestoring(false);
     }
   };
 
@@ -205,19 +363,36 @@ const Configuracion = ({ kiosco }) => {
             
             {kiosco.businessConfig?.plan === 'Básico' && (
               <div style={{ margin: '20px 0' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Activar Plan Pro</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
+                  Activar Plan Pro (Certificado Digital)
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input 
                     type="text" 
                     className="input" 
-                    placeholder="XXXX-XXXX" 
+                    placeholder="Pegá aquí el certificado digital Pro..." 
                     value={licenseKeyInput}
-                    onChange={e => setLicenseKeyInput(e.target.value.toUpperCase())}
-                    style={{ padding: '8px 12px', width: '150px' }}
+                    onChange={e => {
+                      setLicenseKeyInput(e.target.value);
+                      if (licenseError) setLicenseError('');
+                    }}
+                    disabled={isValidatingLicense}
+                    style={{ padding: '8px 12px', flex: 1, fontSize: '13px' }}
                   />
-                  <button className="btn btn-primary" onClick={handleActivateLicense} style={{ padding: '8px 16px' }}>Activar</button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleActivateLicense} 
+                    disabled={isValidatingLicense || !licenseKeyInput.trim()}
+                    style={{ padding: '8px 16px', whiteSpace: 'nowrap' }}
+                  >
+                    {isValidatingLicense ? 'Validando...' : 'Activar Pro'}
+                  </button>
                 </div>
-                {licenseError && <p style={{ color: 'var(--color-danger)', fontSize: '12px', marginTop: '8px' }}>{licenseError}</p>}
+                {licenseError && (
+                  <p style={{ color: 'var(--color-danger)', fontSize: '12px', marginTop: '8px' }}>
+                    {licenseError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -446,6 +621,43 @@ const Configuracion = ({ kiosco }) => {
                   <Check size={16} /> Datos guardados exitosamente
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Card: Copia de Seguridad */}
+          <div className="card" style={{ marginBottom: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <HardDrive size={20} color="var(--color-primary)" />
+              <h2 className="card-title" style={{ margin: 0, fontSize: '16px' }}>Copia de Seguridad</h2>
+            </div>
+            <p className="card-subtitle" style={{ marginBottom: '16px' }}>
+              Guarda un archivo seguro (.spx) con tus productos, ventas, compras, clientes, deudas y turnos en tu computadora o pendrive.
+            </p>
+
+            <div style={{ padding: '12px 14px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '10px', marginBottom: '16px', fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
+              🛡️ <strong>100% Offline y Seguro:</strong> La copia se genera íntegramente en tu equipo con verificación de integridad criptográfica SHA-256. No expone licencias ni requiere internet.
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button 
+                className="btn btn-primary"
+                onClick={handleCreateBackup}
+                disabled={isBackingUp || isRestoring}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontSize: '13.5px' }}
+              >
+                <DownloadCloud size={16} />
+                {isBackingUp ? 'Generando copia de seguridad...' : 'Crear Copia de Seguridad'}
+              </button>
+
+              <button 
+                className="btn btn-outline"
+                onClick={handleSelectRestoreFile}
+                disabled={isBackingUp || isRestoring}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontSize: '13.5px' }}
+              >
+                <UploadCloud size={16} />
+                {isRestoring ? 'Procesando archivo...' : 'Restaurar Copia de Seguridad'}
+              </button>
             </div>
           </div>
 
@@ -696,19 +908,27 @@ const Configuracion = ({ kiosco }) => {
               🛠️ Panel de Desarrollador
             </h3>
             <p style={{ fontSize: '13px', margin: '4px 0 12px 0', color: 'var(--color-text-muted)' }}>
-              Permite alternar el plan para verificar las limitaciones del sistema de inmediato.
+              Herramientas de depuración para desarrollo.
             </p>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <button 
                 className={`btn ${kiosco.businessConfig?.plan === 'Básico' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => kiosco.updateBusinessConfig({ ...kiosco.businessConfig, plan: 'Básico' })}
+                onClick={() => kiosco.updateBusinessConfig({ 
+                  ...kiosco.businessConfig, 
+                  plan: 'Básico',
+                  licenseKey: kiosco.businessConfig?.licenseKey === 'DEV_SIMULATED_PRO_LICENSE' ? '' : kiosco.businessConfig?.licenseKey
+                })}
                 style={{ padding: '8px 16px' }}
               >
                 Simular Plan Básico
               </button>
               <button 
                 className={`btn ${kiosco.businessConfig?.plan === 'Pro' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => kiosco.updateBusinessConfig({ ...kiosco.businessConfig, plan: 'Pro', licenseKey: generateLicenseKey(kiosco.businessConfig?.installationId) })}
+                onClick={() => kiosco.updateBusinessConfig({ 
+                  ...kiosco.businessConfig, 
+                  plan: 'Pro', 
+                  licenseKey: 'DEV_SIMULATED_PRO_LICENSE' 
+                })}
                 style={{ padding: '8px 16px' }}
               >
                 Simular Plan Pro
@@ -730,35 +950,87 @@ const Configuracion = ({ kiosco }) => {
                 Resetear Onboarding
               </button>
             </div>
-
-            {/* Generador de Claves */}
-            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(52, 168, 83, 0.1)', borderRadius: '8px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#137333' }}>Generador de Licencias (Solo Dev)</h4>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input 
-                  type="text" 
-                  className="input" 
-                  placeholder="ID del cliente" 
-                  value={generatorInput}
-                  onChange={e => setGeneratorInput(e.target.value.trim())}
-                  style={{ padding: '6px 12px', fontSize: '13px', width: '220px' }}
-                />
-                <button 
-                  className="btn btn-outline" 
-                  onClick={() => setGeneratedKey(generateLicenseKey(generatorInput))}
-                  style={{ padding: '6px 12px', fontSize: '13px', borderColor: '#34a853', color: '#137333' }}
-                >
-                  Generar
-                </button>
-                {generatedKey && (
-                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1f36' }}>{generatedKey}</span>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
       </div>
+
+      {showRestoreModal && restorePreview && (
+        <div className="modal-overlay" style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.75)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, padding: '20px' }}>
+          <div className="modal-content" style={{ width: '520px', maxWidth: '100%', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)', padding: '28px', animation: 'scaleIn 0.2s ease-out' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '10px', borderRadius: '10px', display: 'flex' }}>
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+                  Restaurar Copia de Seguridad
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  Comercio de origen: <strong>{restorePreview.storeName}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', fontSize: '13px' }}>
+              <div style={{ fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                Contenido del respaldo ({new Date(restorePreview.createdAt).toLocaleString('es-AR')}):
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', color: '#64748b' }}>
+                <div>• Productos: <strong>{restorePreview.summary.productsCount || 0}</strong></div>
+                <div>• Ventas: <strong>{restorePreview.summary.salesCount || 0}</strong></div>
+                <div>• Clientes: <strong>{restorePreview.summary.clientsCount || 0}</strong></div>
+                <div>• Compras: <strong>{restorePreview.summary.purchasesCount || 0}</strong></div>
+                <div>• Turnos: <strong>{restorePreview.summary.shiftsCount || 0}</strong></div>
+                <div>• Caja: <strong>{restorePreview.summary.isCajaOpen ? 'Abierta' : 'Cerrada'} (${restorePreview.summary.efectivoEnCaja || 0})</strong></div>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '12.5px', color: '#b45309', lineHeight: '1.5' }}>
+              ⚠️ <strong>ADVERTENCIA:</strong> Esta acción reemplazará integralmente los datos comerciales actuales por los del archivo. Las ventas, compras y cambios posteriores a la fecha del respaldo se perderán.
+              <div style={{ marginTop: '6px', fontSize: '12px', color: '#92400e' }}>
+                🛡️ Se creará automáticamente un snapshot interno de seguridad antes de modificar datos.
+              </div>
+            </div>
+
+            {(!kiosco.users || !kiosco.users.some(u => u.role === 'Admin' && u.pin)) && (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Configurar PIN del Administrador para este equipo (4 dígitos):
+                </label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  className="input"
+                  placeholder="Ej: 1234"
+                  value={freshInstallAdminPin}
+                  onChange={e => setFreshInstallAdminPin(e.target.value.replace(/\D/g, ''))}
+                  style={{ width: '100%', padding: '10px', fontSize: '16px', letterSpacing: '4px', textAlign: 'center' }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                className="btn btn-outline"
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', fontWeight: 600 }}
+                onClick={() => { setShowRestoreModal(false); setRestorePreview(null); }}
+                disabled={isRestoring}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1.3, padding: '10px', borderRadius: '8px', fontWeight: 600, backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                onClick={handleConfirmRestore}
+                disabled={isRestoring}
+              >
+                {isRestoring ? 'Restaurando...' : 'Confirmar Restauración Integral'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalConfig.isOpen && (
         <div className="modal-overlay" onClick={() => setModalConfig({ ...modalConfig, isOpen: false })} style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26, 31, 54, 0.6)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>

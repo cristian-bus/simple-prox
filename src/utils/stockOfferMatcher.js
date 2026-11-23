@@ -23,6 +23,71 @@ function extractKeywords(text) {
     .filter(word => word.length >= 3 && !STOP_WORDS.has(word));
 }
 
+// Modificadores y marcas de misma familia que son mutuamente excluyentes
+const EXCLUSIVE_MODIFIERS = [
+  new Set(['entera', 'descremada', 'deslactosada', 'semidescremada']),
+  new Set(['girasol', 'oliva', 'maiz', 'mezcla', 'soja']),
+  new Set(['blanco', 'negro']),
+  new Set(['dulce', 'salado', 'amargo']),
+  new Set(['real', '1888', 'rama caida', 'saenz briones', 'del valle'])
+];
+
+/**
+ * Normalización conservadora de singular/plural en español para palabras >= 4 caracteres.
+ * Evita desarmar palabras singulares terminadas en 's' y no altera palabras muy cortas.
+ */
+function toSingular(word) {
+  if (!word || typeof word !== 'string' || word.length < 4) return word;
+
+  const singularEndsWithS = new Set([
+    'pais', 'gris', 'tres', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes',
+    'virus', 'crisis', 'analisis', 'compas', 'chasis', 'paraguas', 'abrelatas'
+  ]);
+  if (singularEndsWithS.has(word)) return word;
+
+  // 1. Plurales con -ces -> -z (ej: nueces -> nuez)
+  if (word.endsWith('ces') && word.length >= 5) {
+    return word.slice(0, -3) + 'z';
+  }
+
+  // 2. Plurales en -es de palabras terminadas en consonante (ej: alfajores -> alfajor, bombones -> bombon)
+  if (word.endsWith('es') && word.length >= 5) {
+    if (word.endsWith('res') || word.endsWith('nes') || word.endsWith('les') || word.endsWith('des') || word.endsWith('ses')) {
+      return word.slice(0, -2);
+    }
+    return word.slice(0, -1);
+  }
+
+  // 3. Plurales en -s tras vocal o préstamos (sidras -> sidra, gaseosas -> gaseosa, yerbas -> yerba, snacks -> snack)
+  if (word.endsWith('s') && !word.endsWith('ss')) {
+    return word.slice(0, -1);
+  }
+
+  return word;
+}
+
+/**
+ * Detecta si dos conjuntos de palabras declaran atributos o marcas mutuamente excluyentes.
+ * Solo genera conflicto si AMBOS lados declaran un modificador diferente del mismo grupo.
+ */
+function hasConflictingModifiers(prodWords, campWords) {
+  const pSet = new Set(prodWords);
+  const cSet = new Set(campWords);
+
+  for (const group of EXCLUSIVE_MODIFIERS) {
+    let pFound = null;
+    let cFound = null;
+    for (const item of group) {
+      if (pSet.has(item)) pFound = item;
+      if (cSet.has(item)) cFound = item;
+    }
+    if (pFound && cFound && pFound !== cFound) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Encuentra la mejor oferta mayorista para un producto determinado.
  * @param {Object} product - Producto del kiosco (name, category, etc.)
@@ -36,6 +101,7 @@ export function findMatchingOfferForProduct(product, campaigns) {
 
   const prodKeywords = extractKeywords(product.name);
   if (prodKeywords.length === 0) return null;
+  const prodSingularKeywords = prodKeywords.map(toSingular);
 
   let bestMatch = null;
   let highestScore = 0;
@@ -47,15 +113,29 @@ export function findMatchingOfferForProduct(product, campaigns) {
 
     const campKeywords = extractKeywords(campaign.title);
     if (campKeywords.length === 0) continue;
+    const campSingularKeywords = campKeywords.map(toSingular);
+
+    // Descartar si declaran marcas o variedades incompatibles (ej. Sidra Real vs Sidra 1888)
+    if (hasConflictingModifiers(prodKeywords, campKeywords)) {
+      continue;
+    }
 
     // Calcular coincidencias de palabras clave
     let matchCount = 0;
-    for (const pWord of prodKeywords) {
-      for (const cWord of campKeywords) {
+    for (let i = 0; i < prodKeywords.length; i++) {
+      const pWord = prodKeywords[i];
+      const pSing = prodSingularKeywords[i];
+
+      for (let j = 0; j < campKeywords.length; j++) {
+        const cWord = campKeywords[j];
+        const cSing = campSingularKeywords[j];
+
         if (pWord === cWord) {
-          matchCount += 2; // Coincidencia exacta
-        } else if (pWord.length >= 4 && cWord.length >= 4 && (pWord.includes(cWord) || cWord.includes(pWord))) {
-          matchCount += 1; // Coincidencia parcial (ej. "fideo" y "fideos")
+          matchCount += 2; // Coincidencia textual idéntica
+        } else if (pSing === cSing) {
+          matchCount += 2; // Coincidencia singular/plural exacta (ej. "sidras" y "sidra")
+        } else if (pSing.length >= 4 && cSing.length >= 4 && (pSing.includes(cSing) || cSing.includes(pSing))) {
+          matchCount += 1; // Coincidencia parcial
         }
       }
     }

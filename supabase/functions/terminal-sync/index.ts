@@ -16,6 +16,64 @@ async function sha256Hex(str: string): Promise<string> {
     .join("");
 }
 
+const BASIC_PUBLIC_KEY_JWK = {
+  crv: "Ed25519",
+  x: "E8DDN-xpkQijtwuNNIA_W9FzXhZQFqjBUDo9PSffCmc",
+  kty: "OKP"
+};
+
+async function verifyBasicLicenseToken(token: string, expectedInstallationId: string): Promise<{ valid: boolean; error?: string; payload?: any }> {
+  try {
+    if (!token || typeof token !== "string" || !token.includes(".")) {
+      return { valid: false, error: "Formato de certificado inválido" };
+    }
+    const [b64Payload, b64Signature] = token.split(".");
+    if (!b64Payload || !b64Signature) {
+      return { valid: false, error: "Token de activación incompleto" };
+    }
+
+    const payloadStr = atob(b64Payload);
+    const payloadBytes = new TextEncoder().encode(payloadStr);
+
+    const binarySig = atob(b64Signature);
+    const sigBytes = new Uint8Array(binarySig.length);
+    for (let i = 0; i < binarySig.length; i++) {
+      sigBytes[i] = binarySig.charCodeAt(i);
+    }
+
+    const payload = JSON.parse(payloadStr);
+    if (payload.version !== 1) return { valid: false, error: "Versión de licencia no soportada" };
+    if (payload.type !== "initial_activation") return { valid: false, error: "Tipo de certificado inválido" };
+    if (payload.plan !== "Básico") return { valid: false, error: "Plan de licencia no autorizado" };
+    if (payload.installationId !== expectedInstallationId) {
+      return { valid: false, error: "El certificado no corresponde a este installationId" };
+    }
+
+    const cryptoKey = await crypto.subtle.importKey(
+      "jwk",
+      BASIC_PUBLIC_KEY_JWK,
+      { name: "Ed25519" },
+      false,
+      ["verify"]
+    );
+
+    const isValid = await crypto.subtle.verify(
+      { name: "Ed25519" },
+      cryptoKey,
+      sigBytes,
+      payloadBytes
+    );
+
+    if (!isValid) {
+      return { valid: false, error: "Firma digital del certificado inválida" };
+    }
+
+    return { valid: true, payload };
+  } catch (err: any) {
+    return { valid: false, error: err.message || "Error al verificar certificado" };
+  }
+}
+
 Deno.serve(async (req: Request) => {
   // Manejo de CORS preflight
   if (req.method === "OPTIONS") {
@@ -411,6 +469,94 @@ Deno.serve(async (req: Request) => {
     }
 
     // -------------------------------------------------------------------------
+    // RUTA: /enroll-license (Enrolamiento Seguro para Terminales con Licencia Básica)
+    // -------------------------------------------------------------------------
+    if (action === "enroll-license" && req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const installationId = String(body.installationId || "").trim();
+      const licenseToken = String(body.licenseToken || "").trim();
+      const merchantData = body.merchantData || {};
+
+      if (!installationId || !licenseToken) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Autenticación requerida: se requiere installationId y licenseToken válido para enrolar"
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 1. Validar criptográficamente el certificado Ed25519
+      const certCheck = await verifyBasicLicenseToken(licenseToken, installationId);
+      if (!certCheck.valid) {
+        console.warn(`[ENROLL LICENSE] Rechazado para ${installationId}: ${certCheck.error}`);
+        return new Response(JSON.stringify({
+          success: false,
+          code: "INVALID_CERTIFICATE",
+          error: certCheck.error || "Certificado digital inválido o alterado"
+        }), {
+          status: 401,
+          headers: corsHeaders
+        });
+      }
+
+      // 2. Generar credencial de terminal segura (256 bits) y su hash SHA-256
+      const rawToken = "spx_term_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+      const tokenHash = await sha256Hex(rawToken);
+      const nowIso = new Date().toISOString();
+
+      // 3. ENROLAMIENTO ATÓMICO EXCLUSIVO MEDIANTE RPC (PostgreSQL Lock FOR UPDATE)
+      // p_allow_rotation = false: un certificado de licencia por sí solo SOLO permite el primer enrolamiento.
+      // Si la terminal ya está activa, se rechaza con 409 ALREADY_ENROLLED para impedir rotación no autorizada.
+      const { data: rpcResult, error: rpcError } = await adminClient.rpc("enroll_terminal_with_license", {
+        p_installation_id: installationId,
+        p_token_hash: tokenHash,
+        p_merchant_data: merchantData,
+        p_allow_rotation: false
+      });
+
+      if (rpcError) {
+        console.error(`[ENROLL LICENSE RPC ERROR] para ${installationId}:`, rpcError);
+        // Regla de Oro: NO ejecutar fallbacks de escritura no atómicos que puedan vulnerar la revocación o la concurrencia.
+        // Se responde con error controlado 503. El POS continúa operando offline sin perder ventas ni licencias.
+        return new Response(JSON.stringify({
+          success: false,
+          code: "RPC_UNAVAILABLE",
+          error: "Servicio de enrolamiento transaccional no disponible en el servidor. Reintente más tarde."
+        }), {
+          status: 503,
+          headers: corsHeaders
+        });
+      }
+
+      if (!rpcResult || !rpcResult.success) {
+        const status = rpcResult?.code === "TERMINAL_REVOKED" ? 403
+                     : rpcResult?.code === "ALREADY_ENROLLED" ? 409
+                     : 400;
+        return new Response(JSON.stringify({
+          success: false,
+          code: rpcResult?.code || "ENROLL_FAILED",
+          error: rpcResult?.error || "No se pudo enrolar la terminal"
+        }), {
+          status,
+          headers: corsHeaders
+        });
+      }
+
+      console.log(`[ENROLL LICENSE SUCCESS] Terminal enrolada exitosamente con licencia: ${installationId}`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        terminalToken: rawToken,
+        installationId
+      }), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
+
+    // -------------------------------------------------------------------------
     // AUTENTICACIÓN GENERAL PARA RUTAS OPERATIVAS (Heartbeat, Register, Events)
     // -------------------------------------------------------------------------
     const termId = req.headers.get("x-terminal-id")?.trim();
@@ -445,6 +591,67 @@ Deno.serve(async (req: Request) => {
       .update({ last_used_at: new Date().toISOString() })
       .eq("installation_id", termId)
       .then(() => {});
+
+    // -------------------------------------------------------------------------
+    // RUTA: /campaigns (Entrega de Campañas B2B con Control de Cupos Diarios)
+    // -------------------------------------------------------------------------
+    if (action === "campaigns" && req.method === "GET") {
+      // 1. Consultar campañas activas
+      const { data: allCampaigns, error: campErr } = await adminClient
+        .from("campaigns")
+        .select("id, title, description, category, type, supplier_name, price, regular_price, unit_price, badge_text, image_url, logo_url, cta_text, whatsapp_number, whatsapp_message, status, priority, daily_limit, is_daily_limit_enabled, start_date, end_date, created_at")
+        .eq("status", "active");
+
+      if (campErr || !allCampaigns) {
+        console.error("[terminal-sync] Error al consultar campañas:", campErr);
+        return new Response(JSON.stringify({ success: false, error: "Error al consultar campañas" }), {
+          status: 500,
+          headers: corsHeaders
+        });
+      }
+
+      // 2. Consultar vista de cupos v_campaign_daily_quotas mediante service_role
+      const { data: quotas, error: quotaErr } = await adminClient
+        .from("v_campaign_daily_quotas")
+        .select("campaign_id, is_quota_exhausted");
+
+      let filteredCampaigns: any[] = [];
+
+      if (quotaErr || !quotas) {
+        console.warn("[terminal-sync] Error al consultar v_campaign_daily_quotas. Aplicando Fail-Safe.");
+        // REGLA DE SEGURIDAD FAIL-SAFE:
+        // Campañas ilimitadas (is_daily_limit_enabled = false) se entregan siempre.
+        // Campañas con cupo (is_daily_limit_enabled = true) se excluyen preventivamente ante fallas.
+        filteredCampaigns = allCampaigns.filter((c: any) => !c.is_daily_limit_enabled);
+      } else {
+        const quotaMap = new Map<string, boolean>();
+        for (const q of quotas) {
+          quotaMap.set(q.campaign_id, q.is_quota_exhausted);
+        }
+
+        filteredCampaigns = allCampaigns.filter((c: any) => {
+          // Si la campaña no tiene límite diario habilitado, siempre se entrega
+          if (!c.is_daily_limit_enabled) {
+            return true;
+          }
+
+          // Si tiene límite habilitado, SOLO puede entregarse si existe una fila válida en la vista
+          // que confirme is_quota_exhausted = false.
+          if (!quotaMap.has(c.id)) {
+            // Falta información en la vista -> exclusión preventiva
+            return false;
+          }
+
+          const isExhausted = quotaMap.get(c.id);
+          return isExhausted === false;
+        });
+      }
+
+      return new Response(JSON.stringify(filteredCampaigns), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
 
     // -------------------------------------------------------------------------
     // RUTA: /heartbeat (Telemetría Técnica con Allowlist Estricta)
@@ -535,10 +742,56 @@ Deno.serve(async (req: Request) => {
 
       const validTypes = new Set(["impression", "offer_open", "whatsapp_click"]);
       let sanitizedEvents = [];
+      let ackCount = 0; // Conteo de eventos reconocidos para confirmar y liberar el Outbox del POS
+
+      const nowMs = Date.now();
+      const MAX_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 días exactos
+      const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000; // Tolerancia de deriva de reloj hacia el futuro: 5 minutos
+      // Formato estricto ISO 8601 con zona horaria explícita obligatoria (Z o +/-HH:MM)
+      const ISO_8601_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
 
       for (const ev of rawEvents.slice(0, 50)) { // Límite de 50 eventos por lote
         const eventType = String(ev.eventType || ev.event_type || "");
         if (!validTypes.has(eventType)) continue;
+
+        // 1. Validación estricta de event_id (NO generar identificadores aleatorios sintéticos)
+        const rawEventId = ev.eventId || ev.event_id;
+        if (typeof rawEventId !== "string" || rawEventId.trim().length === 0) {
+          continue; // Evento inválido sin identificador persistente
+        }
+        const eventId = rawEventId.trim();
+
+        // 2. Validación estricta de timestamp (sintáctica y semántica ISO 8601 con zona horaria explícita)
+        if (!ev.timestamp || typeof ev.timestamp !== "string" || !ISO_8601_TZ_REGEX.test(ev.timestamp)) {
+          continue; // Timestamp ausente, sin formato ISO 8601 o sin zona horaria explícita
+        }
+        const dateParts = ev.timestamp.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!dateParts) continue;
+        const pYear = parseInt(dateParts[1], 10);
+        const pMonth = parseInt(dateParts[2], 10);
+        const pDay = parseInt(dateParts[3], 10);
+        if (pMonth < 1 || pMonth > 12 || pDay < 1 || pDay > 31) continue;
+        const maxDaysInMonth = new Date(Date.UTC(pYear, pMonth, 0)).getUTCDate();
+        if (pDay > maxDaysInMonth) continue; // Rechazo semántico de fechas imposibles (ej. 31 de feb o 29 feb no bisiesto)
+
+        const eventTime = new Date(ev.timestamp).getTime();
+        if (isNaN(eventTime)) {
+          continue; // Timestamp malformado
+        }
+
+        // 3. Regla contra fechas futuras manipuladas (más allá de 5 min de tolerancia de drift de reloj)
+        if (eventTime > nowMs + MAX_FUTURE_SKEW_MS) {
+          continue; // Descarte de eventos con fecha futura
+        }
+
+        // 4. Política de Retención de 30 días:
+        // Si el evento tiene 30 días o más de antigüedad, se reconoce (ackCount++) para que
+        // el POS lo limpie de su Outbox/Deadletter, pero NO se inserta en campaign_events,
+        // previniendo de forma infalible la duplicación post-purga.
+        if (eventTime <= nowMs - MAX_RETENTION_MS) {
+          ackCount++;
+          continue;
+        }
 
         const rawCampaignId = ev.campaignId || ev.campaign_id;
         const campaignId = (typeof rawCampaignId === "string" && rawCampaignId.trim().length > 0)
@@ -546,13 +799,14 @@ Deno.serve(async (req: Request) => {
           : null;
 
         sanitizedEvents.push({
-          event_id: String(ev.eventId || ev.event_id || `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+          event_id: eventId,
           merchant_id: termId, // FORZADO a la terminal autenticada (Imposible suplantar otro comercio)
           campaign_id: campaignId,
           event_type: eventType,
-          timestamp: ev.timestamp || new Date().toISOString(),
-          synced_at: new Date().toISOString()
+          timestamp: new Date(eventTime).toISOString(),
+          synced_at: new Date(nowMs).toISOString()
         });
+        ackCount++;
       }
 
       // Validación batch eficiente: validar existencia de campaign_id en 1 sola consulta
@@ -598,7 +852,8 @@ Deno.serve(async (req: Request) => {
 
       return new Response(JSON.stringify({ 
         success: true, 
-        processedCount: sanitizedEvents.length,
+        processedCount: ackCount,
+        insertedCount: sanitizedEvents.length,
         installationId: termId
       }), {
         status: 200,

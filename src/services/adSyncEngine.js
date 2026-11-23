@@ -1,6 +1,7 @@
 import { generateWhatsAppMessage, calculateDiscount, extractB2BMetadata, getCampaignStatus, generateCampaignCode } from '../utils/b2bUtils.js';
 import { enqueueOutbox, flushOutbox, getOutbox } from './syncService.js';
-import { sendTerminalRegister } from './terminalIdentityService.js';
+import { sendTerminalRegister, getStoredTerminalToken, getTerminalSyncUrl } from './terminalIdentityService.js';
+import { getInstallationId } from './installationService.js';
 import { APP_VERSION } from '../constants/version.js';
 
 const CACHE_KEYS = {
@@ -26,7 +27,8 @@ export function getAdConfig() {
         apiUrl: parsed.apiUrl || parsed.supabaseUrl || DEFAULT_SUPABASE_URL,
         apiKey: parsed.apiKey || parsed.supabaseKey || '',
         enabled: parsed.enabled !== false,
-        syncIntervalMinutes: parsed.syncIntervalMinutes || 15
+        syncIntervalMinutes: parsed.syncIntervalMinutes || 15,
+        useTerminalSyncCampaigns: parsed.useTerminalSyncCampaigns === true
       };
     }
   } catch (e) {}
@@ -37,7 +39,8 @@ export function getAdConfig() {
     apiUrl: DEFAULT_SUPABASE_URL, 
     apiKey: '', 
     enabled: true, 
-    syncIntervalMinutes: 15 
+    syncIntervalMinutes: 15,
+    useTerminalSyncCampaigns: false
   };
 }
 
@@ -91,11 +94,20 @@ export async function syncCampaignsRemotely(merchantInfo = {}) {
 
   if (!supabaseKey) {
     try {
-      const staticCfg = await import('../../public/ad_config.json', { with: { type: 'json' } }).then(m => m.default || m);
-      if (staticCfg.supabaseUrl) supabaseUrl = staticCfg.supabaseUrl;
-      if (staticCfg.supabaseKey) supabaseKey = staticCfg.supabaseKey;
+      const resp = await fetch('/ad_config.json');
+      if (resp.ok) {
+        const staticCfg = await resp.json();
+        if (staticCfg.supabaseUrl) supabaseUrl = staticCfg.supabaseUrl;
+        if (staticCfg.supabaseKey) supabaseKey = staticCfg.supabaseKey;
+      }
     } catch (e) {
-      console.warn('No se pudo cargar ad_config.json local', e);
+      try {
+        const staticCfg = await import('../../public/ad_config.json', { with: { type: 'json' } }).then(m => m.default || m);
+        if (staticCfg.supabaseUrl) supabaseUrl = staticCfg.supabaseUrl;
+        if (staticCfg.supabaseKey) supabaseKey = staticCfg.supabaseKey;
+      } catch (err) {
+        console.warn('No se pudo cargar ad_config.json local', err);
+      }
     }
   }
 
@@ -103,17 +115,42 @@ export async function syncCampaignsRemotely(merchantInfo = {}) {
 
   if (supabaseUrl && isValidKey && navigator.onLine) {
     try {
-      const baseUrl = supabaseUrl.replace(/\/$/, '');
-      const endpoint = baseUrl.includes('/rest/v1') 
-        ? `${baseUrl}/campaigns?select=*`
-        : `${baseUrl}/rest/v1/campaigns?select=*`;
+      const useTerminalSync = config.useTerminalSyncCampaigns === true;
+      let endpoint;
+      const reqHeaders = {
+        'Accept': 'application/json'
+      };
+
+      if (useTerminalSync) {
+        const terminalSyncUrl = getTerminalSyncUrl();
+        endpoint = `${terminalSyncUrl}/campaigns`;
+        const installationId = merchantInfo?.installationId || getInstallationId();
+        const terminalToken = await getStoredTerminalToken();
+
+        if (!installationId || !terminalToken) {
+          console.warn('[AdSyncEngine] Sin credencial de terminal activa para terminal-sync/campaigns. Preservando caché local.');
+          return getCachedCampaigns();
+        }
+
+        reqHeaders['Content-Type'] = 'application/json';
+        reqHeaders['x-terminal-id'] = installationId;
+        reqHeaders['x-terminal-token'] = terminalToken;
+        if (supabaseKey) {
+          reqHeaders['apikey'] = supabaseKey;
+          reqHeaders['Authorization'] = `Bearer ${supabaseKey}`;
+        }
+      } else {
+        const baseUrl = supabaseUrl.replace(/\/$/, '');
+        endpoint = baseUrl.includes('/rest/v1') 
+          ? `${baseUrl}/campaigns?select=*`
+          : `${baseUrl}/rest/v1/campaigns?select=*`;
+
+        reqHeaders['apikey'] = supabaseKey;
+        reqHeaders['Authorization'] = `Bearer ${supabaseKey}`;
+      }
 
       const response = await fetch(endpoint, {
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Accept': 'application/json'
-        },
+        headers: reqHeaders,
         cache: 'no-store'
       });
 
@@ -127,8 +164,8 @@ export async function syncCampaignsRemotely(merchantInfo = {}) {
             if (st === 'paused' || st === 'draft') return false;
 
             const { meta } = extractB2BMetadata(c.description);
-            const start = c.start_date || c.startDate || meta.startDate;
-            const end = c.end_date || c.endDate || meta.endDate;
+            const start = (meta && meta.startDate) ? meta.startDate : (c.start_date || c.startDate || null);
+            const end = (meta && meta.endDate) ? meta.endDate : (c.end_date || c.endDate || null);
 
             const computedStatus = getCampaignStatus({
               ...c,
@@ -173,12 +210,13 @@ export async function syncCampaignsRemotely(merchantInfo = {}) {
               startDate: meta.startDate !== undefined ? meta.startDate : (c.start_date || c.startDate || null),
               endDate: meta.endDate !== undefined ? meta.endDate : (c.end_date || c.endDate || null),
               status: c.status || 'active',
-              priority: c.priority || 10
+              priority: c.priority || 10,
+              isSmartAdvertising: Boolean(c.is_smart_advertising_enabled || c.isSmartAdvertising || meta.isSmartAdvertising)
             };
           });
 
-          // Registrar este Kiosco con toda su información (plan, contacto, instalador) en Supabase
-          registerMerchantRemotely(merchantInfo).catch(() => {});
+          // NOTA DE OPTIMIZACIÓN (Fase 1): Desacoplado el registro remoto del ciclo periódico de campañas.
+          // El registro se gestiona exclusivamente al iniciar el POS, ante cambios de configuración o al recuperar conexión.
 
           setCachedCampaigns(mappedCampaigns);
           return mappedCampaigns;
@@ -194,6 +232,9 @@ export async function syncCampaignsRemotely(merchantInfo = {}) {
 
 // Registrar o actualizar información completa del comercio en Supabase
 export async function registerMerchantRemotely(merchantInfo = {}) {
+  if (import.meta.env?.DEV && typeof window !== 'undefined' && sessionStorage.getItem('kioscoprox_demo_active') === 'true') {
+    return false;
+  }
   // 1. Obtener respaldo de datos del comercio desde localStorage para complementar cualquier campo
   let localBiz = {};
   try {
@@ -390,10 +431,13 @@ export function trackAdEvent({ campaignId, merchantId, eventType }) {
   };
 
   // Encolar exclusivamente en Outbox centralizado (eliminada la escritura redundante en PENDING_EVENTS)
+  if (import.meta.env?.DEV && typeof window !== 'undefined' && sessionStorage.getItem('kioscoprox_demo_active') === 'true') {
+    return eventObj;
+  }
   enqueueOutbox('CAMPAIGN_EVENT', eventObj);
 
-  // Sincronizar Outbox en segundo plano
-  flushOutbox().catch(() => {});
+  // NOTA FASE 2: Eliminado el flushOutbox() inmediato en cada evento individual.
+  // El Outbox se gestiona en lotes periódicamente cada 10 min o anticipadamente por umbral (>= 40 eventos).
 
   return eventObj;
 }

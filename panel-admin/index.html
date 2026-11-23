@@ -1000,6 +1000,11 @@
         <span>Distribuidores</span>
       </button>
 
+      <button class="nav-btn" onclick="switchTab('finance')">
+        <i data-lucide="receipt"></i>
+        <span>Cobros y Finanzas</span>
+      </button>
+
       <button class="nav-btn" onclick="switchTab('settings')">
         <i data-lucide="database"></i>
         <span>Configuración API</span>
@@ -1338,6 +1343,7 @@
                   <th style="width: 105px;">Teléfono</th>
                   <th style="width: 110px;">Provincia</th>
                   <th style="width: 110px;">Ciudad</th>
+                  <th style="width: 110px; text-align: center;">Activación</th>
                   <th style="width: 75px; text-align: center;">Versión</th>
                   <th style="width: 105px;">Conexión</th>
                   <th style="width: 65px; text-align: center;">Estado</th>
@@ -1366,6 +1372,9 @@
             <div style="display: flex; gap: 10px;">
               <button class="btn btn-primary" onclick="openCreateDistributorModal()">
                 <i data-lucide="plus"></i> Nuevo Distribuidor
+              </button>
+              <button class="btn btn-outline" onclick="openImportCatalogModal()" title="Importar catálogo base como registros de referencia de forma explícita" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">
+                <i data-lucide="download-cloud"></i> Catálogo de Referencia
               </button>
               <button class="btn btn-outline" onclick="exportDistributorsJSON()">
                 <i data-lucide="download"></i> Exportar JSON
@@ -1447,6 +1456,17 @@
             </div>
           </div>
 
+        <div id="distributors-local-cache-banner" style="display: none; margin: 0 0 16px 0; padding: 12px 18px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 12px; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <i data-lucide="info" style="color: #60a5fa; width: 20px; height: 20px; flex-shrink: 0;"></i>
+              <span style="font-size: 13px; color: #cbd5e1;">Se detectaron <strong>distribuidores guardados localmente</strong> en este navegador. ¿Deseas revisarlos para migrarlos a Supabase?</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-sm btn-primary" onclick="openReviewLocalStorageModal()" style="font-size: 12px; padding: 4px 10px;">Revisar y Migrar</button>
+              <button class="btn btn-sm btn-outline" onclick="dismissLocalCacheBanner()" style="font-size: 12px; padding: 4px 8px;">Ocultar</button>
+            </div>
+          </div>
+
         <div class="table-container">
             <table>
               <thead>
@@ -1470,6 +1490,109 @@
       </div>
 
       <!-- VISTA TAB 5: CONFIGURACIÓN -->
+      
+      <!-- VISTA TAB 5: COBROS Y VENCIMIENTOS B2B -->
+      <div id="view-finance" class="tab-view hidden">
+        <!-- Tarjetas de Resumen Financiero -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <div class="card" style="margin-bottom: 0; padding: 18px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(59, 130, 246, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Facturado Mes</span>
+              <i data-lucide="calendar" style="width: 18px; height: 18px; color: #38bdf8;"></i>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #ffffff;" id="finance-stat-billed">$0</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Cuotas emitidas del mes</div>
+          </div>
+
+          <div class="card" style="margin-bottom: 0; padding: 18px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(16, 185, 129, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Cobrado Efectivo</span>
+              <i data-lucide="check-circle" style="width: 18px; height: 18px; color: #10b981;"></i>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #10b981;" id="finance-stat-collected">$0</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Acreditado en el período</div>
+          </div>
+
+          <div class="card" style="margin-bottom: 0; padding: 18px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(245, 158, 11, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Saldo Pendiente</span>
+              <i data-lucide="clock" style="width: 18px; height: 18px; color: #f59e0b;"></i>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #f59e0b;" id="finance-stat-pending">$0</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Remanente por cobrar</div>
+          </div>
+
+          <div class="card" style="margin-bottom: 0; padding: 18px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(239, 68, 68, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Cuotas Vencidas</span>
+              <i data-lucide="alert-triangle" style="width: 18px; height: 18px; color: #ef4444;"></i>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #ef4444;" id="finance-stat-overdue">0 ($0)</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Expiradas sin cancelar</div>
+          </div>
+        </div>
+
+        <!-- Tabla y Controles de Cobranzas -->
+        <div class="card">
+          <div class="card-header" style="flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <h2 class="card-title" style="margin: 0;">Control de Cuotas y Cobranzas</h2>
+              <span id="finance-header-counter" style="font-size: 12px; font-weight: 700; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border);">0 cuotas</span>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="openCreateInvoiceModal()">
+                <i data-lucide="plus-circle"></i> + Nueva Cuota
+              </button>
+              <button class="btn btn-outline" onclick="openCreateContractModal()" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">
+                <i data-lucide="file-text"></i> + Nuevo Acuerdo B2B
+              </button>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros -->
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
+              <select id="finance-filter-distributor" class="form-control" style="width: 220px; height: 38px; font-size: 12.5px;" onchange="renderFinanceTable()">
+                <option value="all">🏢 Todos los mayoristas</option>
+              </select>
+
+              <select id="finance-filter-status" class="form-control" style="width: 170px; height: 38px; font-size: 12.5px;" onchange="renderFinanceTable()">
+                <option value="all">📋 Todos los estados</option>
+                <option value="pending">⏳ Pendientes</option>
+                <option value="partial">🟡 Parciales</option>
+                <option value="paid">🟢 Pagadas</option>
+                <option value="overdue">🔴 Vencidas</option>
+              </select>
+            </div>
+
+            <button id="btn-finance-refresh" class="btn btn-outline" style="font-size: 12px; padding: 6px 12px;" onclick="loadFinanceData(true)" title="Actualizar datos desde Supabase">
+              <i data-lucide="refresh-cw"></i> Actualizar
+            </button>
+          </div>
+
+          <!-- Tabla de Cuotas -->
+          <div class="table-container">
+            <table class="merchants-table">
+              <thead>
+                <tr>
+                  <th>Mayorista</th>
+                  <th>Período</th>
+                  <th style="text-align: center;">Vencimiento</th>
+                  <th style="text-align: right;">Importe Original</th>
+                  <th style="text-align: right;">Cobrado</th>
+                  <th style="text-align: right;">Saldo</th>
+                  <th style="text-align: center;">Estado</th>
+                  <th style="text-align: center;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="finance-table-body">
+                <tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">Cargando cuotas...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div id="view-settings" class="tab-view hidden">
         <div class="card">
           <div class="card-header">
@@ -1707,9 +1830,41 @@
       <form id="distributor-form" onsubmit="handleSaveDistributor(event)">
         <input type="hidden" id="form-distributor-id" value="">
         
-        <div class="form-group">
-          <label>Nombre del Distribuidor *</label>
-          <input type="text" id="form-distributor-name" class="form-control" placeholder="ej. Mayorista El Triunfo" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre Comercial / Mayorista *</label>
+            <input type="text" id="form-distributor-name" class="form-control" placeholder="ej. Mayorista El Triunfo" required>
+          </div>
+          <div class="form-group">
+            <label>Tipo de Registro Comercial</label>
+            <select id="form-distributor-record-type" class="form-control">
+              <option value="contracted">🟢 Mayorista Contratado (Cliente Real)</option>
+              <option value="prospect">🟠 Prospecto Comercial</option>
+              <option value="catalog_example">📦 Catálogo / Referencia</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Razón Social / Nombre Legal</label>
+            <input type="text" id="form-distributor-legal-name" class="form-control" placeholder="ej. Distribuidora MAC S.R.L.">
+          </div>
+          <div class="form-group">
+            <label>CUIT (Opcional)</label>
+            <input type="text" id="form-distributor-cuit" class="form-control" placeholder="30-71234567-8">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Responsable Comercial</label>
+            <input type="text" id="form-distributor-contact" class="form-control" placeholder="ej. Martín Álvarez">
+          </div>
+          <div class="form-group">
+            <label>Fecha de Inicio de Relación</label>
+            <input type="date" id="form-distributor-commercial-start" class="form-control">
+          </div>
         </div>
 
         <div class="form-row">
@@ -1721,6 +1876,7 @@
             <label>Categoría Principal</label>
             <select id="form-distributor-category" class="form-control">
               <option value="">Seleccionar...</option>
+              <option value="QA_TEST">Prueba técnica (QA) - No comercial</option>
             </select>
           </div>
         </div>
@@ -2200,6 +2356,19 @@
           filterDistCategory.appendChild(opt3);
         }
       });
+
+      if (formDistCategory) {
+        const optQa = document.createElement('option');
+        optQa.value = 'QA_TEST';
+        optQa.textContent = 'Prueba técnica (QA) - No comercial';
+        formDistCategory.appendChild(optQa);
+      }
+      if (filterDistCategory) {
+        const filterOptQa = document.createElement('option');
+        filterOptQa.value = 'QA_TEST';
+        filterOptQa.textContent = 'Prueba técnica (QA) - No comercial';
+        filterDistCategory.appendChild(filterOptQa);
+      }
 
       if (typeof syncPickerButton === 'function') {
         syncPickerButton('filter-campaign-category');
@@ -2893,6 +3062,18 @@
       lucide.createIcons();
     }
 
+    // Utilidad de validación estricta para conteos consolidados
+    function getValidEventCount(val) {
+      if (typeof val === 'number') {
+        return Number.isInteger(val) && val >= 0 ? val : 0;
+      }
+      if (typeof val === 'string' && val.trim() !== '') {
+        const n = Number(val);
+        return Number.isInteger(n) && n >= 0 ? n : 0;
+      }
+      return 0;
+    }
+
     // Renderizado de Métricas con Filtros Temporales y Ordenamiento
     function renderMetrics() {
       const tbody = document.getElementById('metrics-table-body');
@@ -2901,43 +3082,55 @@
       const period = document.getElementById('metrics-period-select')?.value || 'all';
       const sortBy = document.getElementById('metrics-sort-select')?.value || 'impressions';
 
-      // Filtrar eventos por periodo
-      const now = new Date();
+      // Filtrar métricas por periodo utilizando días calendario completos (fecha Argentina YYYY-MM-DD)
       let filteredEvents = [...rawEvents];
 
       if (period === 'today') {
         const todayStr = getLocalTodayString();
-        filteredEvents = filteredEvents.filter(e => {
-          if (!e.timestamp) return false;
-          const d = new Date(e.timestamp);
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          return `${y}-${m}-${day}` === todayStr;
-        });
+        filteredEvents = filteredEvents.filter(e => e.event_date === todayStr);
       } else if (period === '7d') {
-        const t7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        filteredEvents = filteredEvents.filter(e => new Date(e.timestamp) >= t7);
+        // Días calendario completos: desde hace 7 días calendario hasta hoy inclusive
+        const d7 = new Date();
+        d7.setDate(d7.getDate() - 7);
+        const y7 = d7.getFullYear();
+        const m7 = String(d7.getMonth() + 1).padStart(2, '0');
+        const day7 = String(d7.getDate()).padStart(2, '0');
+        const limit7Str = `${y7}-${m7}-${day7}`;
+        filteredEvents = filteredEvents.filter(e => e.event_date && e.event_date >= limit7Str);
       } else if (period === '30d') {
-        const t30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        filteredEvents = filteredEvents.filter(e => new Date(e.timestamp) >= t30);
+        // Días calendario completos: desde hace 30 días calendario hasta hoy inclusive
+        const d30 = new Date();
+        d30.setDate(d30.getDate() - 30);
+        const y30 = d30.getFullYear();
+        const m30 = String(d30.getMonth() + 1).padStart(2, '0');
+        const day30 = String(d30.getDate()).padStart(2, '0');
+        const limit30Str = `${y30}-${m30}-${day30}`;
+        filteredEvents = filteredEvents.filter(e => e.event_date && e.event_date >= limit30Str);
       } else if (period === 'month') {
         const mStr = getLocalTodayString().slice(0, 7);
-        filteredEvents = filteredEvents.filter(e => {
-          if (!e.timestamp) return false;
-          const d = new Date(e.timestamp);
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          return `${y}-${m}` === mStr;
-        });
+        filteredEvents = filteredEvents.filter(e => e.event_date && e.event_date.startsWith(mStr));
       }
 
-      // Calcular métricas por campaña
+      // Calcular métricas por campaña sumando numéricamente event_count
       let metricsData = campaigns.map(c => {
-        const myEvs = filteredEvents.filter(e => e.campaign_id === c.id || e.campaign_id === c.title);
-        const imp = myEvs.filter(e => e.event_type === 'impression').length;
-        const opens = myEvs.filter(e => e.event_type === 'offer_open').length;
-        const wpp = myEvs.filter(e => e.event_type === 'whatsapp_click').length;
+        let imp = 0;
+        let opens = 0;
+        let wpp = 0;
+
+        for (let i = 0; i < filteredEvents.length; i++) {
+          const e = filteredEvents[i];
+          if (e.campaign_id === c.id || e.campaign_id === c.title) {
+            const cnt = getValidEventCount(e.event_count);
+            if (e.event_type === 'impression') {
+              imp += cnt;
+            } else if (e.event_type === 'offer_open') {
+              opens += cnt;
+            } else if (e.event_type === 'whatsapp_click') {
+              wpp += cnt;
+            }
+          }
+        }
+
         const ctr = imp > 0 ? ((wpp / imp) * 100) : 0;
 
         let campaignCode = c.campaign_code || c.campaignCode;
@@ -3013,10 +3206,24 @@
       const c = campaigns.find(x => x.id === campaignId);
       if (!c) return;
 
-      const myEvs = rawEvents.filter(e => e.campaign_id === c.id || e.campaign_id === c.title);
-      const imp = myEvs.filter(e => e.event_type === 'impression').length;
-      const opens = myEvs.filter(e => e.event_type === 'offer_open').length;
-      const wpp = myEvs.filter(e => e.event_type === 'whatsapp_click').length;
+      let imp = 0;
+      let opens = 0;
+      let wpp = 0;
+
+      for (let i = 0; i < rawEvents.length; i++) {
+        const e = rawEvents[i];
+        if (e.campaign_id === c.id || e.campaign_id === c.title) {
+          const cnt = getValidEventCount(e.event_count);
+          if (e.event_type === 'impression') {
+            imp += cnt;
+          } else if (e.event_type === 'offer_open') {
+            opens += cnt;
+          } else if (e.event_type === 'whatsapp_click') {
+            wpp += cnt;
+          }
+        }
+      }
+
       const ctr = imp > 0 ? ((wpp / imp) * 100).toFixed(2) : '0.00';
 
       const content = document.getElementById('metric-detail-content');
@@ -3071,9 +3278,22 @@
     }
 
     function updateGlobalStats() {
-      const totalImp = rawEvents.filter(e => e.event_type === 'impression').length;
-      const totalCta = rawEvents.filter(e => e.event_type === 'whatsapp_click').length;
-      const totalOpens = rawEvents.filter(e => e.event_type === 'offer_open').length;
+      let totalImp = 0;
+      let totalCta = 0;
+      let totalOpens = 0;
+
+      for (let i = 0; i < rawEvents.length; i++) {
+        const e = rawEvents[i];
+        const cnt = getValidEventCount(e.event_count);
+        if (e.event_type === 'impression') {
+          totalImp += cnt;
+        } else if (e.event_type === 'whatsapp_click') {
+          totalCta += cnt;
+        } else if (e.event_type === 'offer_open') {
+          totalOpens += cnt;
+        }
+      }
+
       const ctr = totalImp ? ((totalCta / totalImp) * 100).toFixed(2) : '0.00';
 
       const elImp = document.getElementById('kpi-impressions');
@@ -3854,21 +4074,22 @@
               };
             });
 
-            // Cargar Eventos Reales con Paginación Completa (evitando el tope de 1000 filas de PostgREST)
+            // Cargar Métricas Agregadas con Paginación Segura (public.v_campaign_combined_metrics)
             try {
               const baseEvUrl = baseUrl.includes('/rest/v1') 
-                ? `${baseUrl}/campaign_events` 
-                : `${baseUrl}/rest/v1/campaign_events`;
+                ? `${baseUrl}/v_campaign_combined_metrics` 
+                : `${baseUrl}/rest/v1/v_campaign_combined_metrics`;
 
               const authHeader = `Bearer ${typeof authSession !== 'undefined' && authSession ? authSession.access_token : supabaseKey}`;
 
-              let allEvents = [];
+              let allMetrics = [];
               let offset = 0;
               const pageSize = 1000;
               let keepFetching = true;
+              let fetchSuccess = true;
 
               while (keepFetching) {
-                const evEndpoint = `${baseEvUrl}?select=campaign_id,event_type,timestamp&order=timestamp.desc&limit=${pageSize}&offset=${offset}`;
+                const evEndpoint = `${baseEvUrl}?select=campaign_id,event_date,event_type,event_count&order=event_date.desc&limit=${pageSize}&offset=${offset}`;
                 const evRes = await fetch(evEndpoint, {
                   headers: { 
                     'apikey': supabaseKey, 
@@ -3879,7 +4100,7 @@
                 if (evRes.ok) {
                   const batch = await evRes.json();
                   if (Array.isArray(batch) && batch.length > 0) {
-                    allEvents.push(...batch);
+                    allMetrics.push(...batch);
                     if (batch.length < pageSize) {
                       keepFetching = false;
                     } else {
@@ -3889,26 +4110,38 @@
                     keepFetching = false;
                   }
                 } else {
-                  console.warn('Error al paginar eventos de Supabase:', evRes.status);
+                  console.warn('Error al paginar métricas agregadas de Supabase:', evRes.status);
                   keepFetching = false;
+                  fetchSuccess = false;
                 }
 
                 if (offset >= 500000) keepFetching = false; // Salvaguarda
               }
 
-              if (allEvents.length > 0) {
-                rawEvents = allEvents;
+              if (fetchSuccess) {
+                rawEvents = allMetrics;
                 try {
-                  localStorage.setItem('kioscoprox_events_cache', JSON.stringify(allEvents));
+                  localStorage.setItem('kioscoprox_aggregated_metrics_cache_v1', JSON.stringify(allMetrics));
                 } catch(e) {}
               } else {
+                // Recuperación segura ante fallo de red o error HTTP: nunca sobrescribir si el fetch falló
                 try {
-                  const cached = localStorage.getItem('kioscoprox_events_cache');
-                  if (cached) rawEvents = JSON.parse(cached);
+                  const cached = localStorage.getItem('kioscoprox_aggregated_metrics_cache_v1');
+                  if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed)) rawEvents = parsed;
+                  }
                 } catch(e) {}
               }
             } catch(e) {
-              console.warn('Error cargando eventos:', e);
+              console.warn('Error cargando métricas agregadas:', e);
+              try {
+                const cached = localStorage.getItem('kioscoprox_aggregated_metrics_cache_v1');
+                if (cached) {
+                  const parsed = JSON.parse(cached);
+                  if (Array.isArray(parsed)) rawEvents = parsed;
+                }
+              } catch(err) {}
             }
 
             renderCampaigns();
@@ -4293,6 +4526,20 @@
         const sorted = [...merchants].sort((a, b) => new Date(b.last_active || 0) - new Date(a.last_active || 0));
 
         sorted.forEach(m => {
+          let activationDateStr = 'Preexistente';
+          if (m.created_at) {
+            try {
+              const dAct = new Date(m.created_at);
+              const dayA = String(dAct.getDate()).padStart(2, '0');
+              const monthA = String(dAct.getMonth() + 1).padStart(2, '0');
+              const yearA = dAct.getFullYear();
+              const hA = String(dAct.getHours()).padStart(2, '0');
+              const mA = String(dAct.getMinutes()).padStart(2, '0');
+              activationDateStr = `${dayA}/${monthA}/${yearA} ${hA}:${mA}`;
+            } catch(e) {
+              activationDateStr = m.created_at.slice(0, 10);
+            }
+          }
           let lastActive = 'Reciente';
           if (m.last_active) {
             try {
@@ -4342,6 +4589,7 @@
             <td style="white-space: nowrap;">${phoneHtml}</td>
             <td style="font-size: 12px; color: #cbd5e1; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${provStr}">${provStr}</td>
             <td style="font-size: 12px; color: var(--text-muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${cityStr}">${cityStr}</td>
+            <td style="text-align: center; font-size: 11px; color: #a5b4fc; white-space: nowrap;" title="Fecha de primera activación">${activationDateStr}</td>
             <td style="text-align: center; white-space: nowrap;">${versionBadge}</td>
             <td style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap;">${lastActive}</td>
             <td style="text-align: center; white-space: nowrap;">${statusBadge}</td>
@@ -4491,6 +4739,13 @@
         document.getElementById('btn-header-new-campaign').style.display = 'none';
         populateDistributorCityOptions();
         renderDistributors();
+        checkLocalStorageDistributorsBanner();
+      } else if (tabName === 'finance') {
+        document.getElementById('tab-title').innerText = 'Control de Cobros y Finanzas B2B';
+        document.getElementById('tab-subtitle').innerText = 'Administración de cuotas publicitarias, pagos, vencimientos y saldos de mayoristas';
+        document.getElementById('view-finance').classList.remove('hidden');
+        document.getElementById('btn-header-new-campaign').style.display = 'none';
+        loadFinanceData();
       } else if (tabName === 'settings') {
         document.getElementById('tab-title').innerText = 'Configuración API Nube';
         document.getElementById('tab-subtitle').innerText = 'Parámetros de conexión con la base de datos Supabase';
@@ -4540,12 +4795,39 @@
             const cfg = await res.json();
             if (cfg.supabaseUrl) document.getElementById('api-url-input').value = cfg.supabaseUrl;
             if (cfg.supabaseKey) document.getElementById('api-key-input').value = cfg.supabaseKey;
+            localStorage.setItem('kioscoprox_ad_config', JSON.stringify({
+              supabaseUrl: cfg.supabaseUrl,
+              supabaseKey: cfg.supabaseKey,
+              apiUrl: cfg.supabaseUrl,
+              apiKey: cfg.supabaseKey,
+              enabled: true
+            }));
           } else {
             // Fallback direct to project config if fetch fails
-            document.getElementById('api-url-input').value = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
+            const defaultUrl = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
+            const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0aXhiaWlraHVoendzaGZneWVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2MTU1OTIsImV4cCI6MjEwMzE5MTU5Mn0.VxLd2eJChGHmTDuQT72mtHILUC6iWDAUVgH4ak1OHHE';
+            document.getElementById('api-url-input').value = defaultUrl;
+            document.getElementById('api-key-input').value = defaultKey;
+            localStorage.setItem('kioscoprox_ad_config', JSON.stringify({
+              supabaseUrl: defaultUrl,
+              supabaseKey: defaultKey,
+              apiUrl: defaultUrl,
+              apiKey: defaultKey,
+              enabled: true
+            }));
           }
         } catch(e) {
-            document.getElementById('api-url-input').value = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
+            const defaultUrl = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
+            const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0aXhiaWlraHVoendzaGZneWVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2MTU1OTIsImV4cCI6MjEwMzE5MTU5Mn0.VxLd2eJChGHmTDuQT72mtHILUC6iWDAUVgH4ak1OHHE';
+            document.getElementById('api-url-input').value = defaultUrl;
+            document.getElementById('api-key-input').value = defaultKey;
+            localStorage.setItem('kioscoprox_ad_config', JSON.stringify({
+              supabaseUrl: defaultUrl,
+              supabaseKey: defaultKey,
+              apiUrl: defaultUrl,
+              apiKey: defaultKey,
+              enabled: true
+            }));
         }
       }
     } catch(e) {}
@@ -4797,6 +5079,9 @@
           <td style="font-size: 11px; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${d.conditions || '-'}</td>
           <td style="text-align: right;">
             <div style="display: inline-flex; gap: 6px; align-items: center;">
+              <button class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; color: #c084fc; border-color: rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.08); display: inline-flex; align-items: center; gap: 5px;" onclick="openDistributorProfileModal('${d.id}')" title="Ver Ficha Comercial Integral, Acuerdos y Pagos">
+                <i data-lucide="building" style="width:14px; height:14px;"></i> <span style="font-weight:700;">Ficha B2B</span>
+              </button>
               <button class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); display: inline-flex; align-items: center; gap: 5px;" onclick="openDistributorPerformanceModal('${d.id}')" title="Ver Rendimiento y Comparativa de Campañas">
                 <i data-lucide="bar-chart-2" style="width:14px; height:14px;"></i> <span style="font-weight:700;">Rendimiento</span>
               </button>
@@ -4837,10 +5122,24 @@
     }
 
     function getCampaignMetrics(c) {
-      const myEvs = rawEvents.filter(e => e.campaign_id === c.id || e.campaign_id === c.title);
-      const imp = myEvs.filter(e => e.event_type === 'impression').length;
-      const opens = myEvs.filter(e => e.event_type === 'offer_open').length;
-      const wpp = myEvs.filter(e => e.event_type === 'whatsapp_click').length;
+      let imp = 0;
+      let opens = 0;
+      let wpp = 0;
+
+      for (let i = 0; i < rawEvents.length; i++) {
+        const e = rawEvents[i];
+        if (e.campaign_id === c.id || e.campaign_id === c.title) {
+          const cnt = getValidEventCount(e.event_count);
+          if (e.event_type === 'impression') {
+            imp += cnt;
+          } else if (e.event_type === 'offer_open') {
+            opens += cnt;
+          } else if (e.event_type === 'whatsapp_click') {
+            wpp += cnt;
+          }
+        }
+      }
+
       const ctr = imp > 0 ? Number(((wpp / imp) * 100).toFixed(1)) : 0;
       return {
         impressions: imp,
@@ -5219,8 +5518,22 @@
       document.getElementById('distributor-modal-title').innerText = 'Editar Distribuidor';
       document.getElementById('form-distributor-id').value = d.id;
       document.getElementById('form-distributor-name').value = d.name || '';
+      if (document.getElementById('form-distributor-legal-name')) document.getElementById('form-distributor-legal-name').value = d.legalName || '';
+      if (document.getElementById('form-distributor-cuit')) document.getElementById('form-distributor-cuit').value = d.cuit || '';
+      if (document.getElementById('form-distributor-contact')) document.getElementById('form-distributor-contact').value = d.contactName || '';
+      if (document.getElementById('form-distributor-record-type')) document.getElementById('form-distributor-record-type').value = d.recordType || 'contracted';
+      if (document.getElementById('form-distributor-commercial-start')) document.getElementById('form-distributor-commercial-start').value = d.commercialStartDate || '';
       document.getElementById('form-distributor-whatsapp').value = d.whatsappNumber || '';
-      document.getElementById('form-distributor-category').value = d.category || '';
+      const selectCat = document.getElementById('form-distributor-category');
+      if (selectCat) {
+        if (d.category && !Array.from(selectCat.options).some(o => o.value === d.category)) {
+          const customOpt = document.createElement('option');
+          customOpt.value = d.category;
+          customOpt.textContent = d.category;
+          selectCat.appendChild(customOpt);
+        }
+        selectCat.value = d.category || '';
+      }
       document.getElementById('form-distributor-min').value = d.minPurchase || '';
       document.getElementById('form-distributor-conditions').value = d.conditions || '';
       if (document.getElementById('form-distributor-province')) {
@@ -5241,6 +5554,11 @@
       const id = document.getElementById('form-distributor-id').value;
       const data = {
         name: document.getElementById('form-distributor-name').value.trim(),
+        legalName: document.getElementById('form-distributor-legal-name')?.value.trim() || null,
+        cuit: document.getElementById('form-distributor-cuit')?.value.trim() || null,
+        contactName: document.getElementById('form-distributor-contact')?.value.trim() || null,
+        recordType: document.getElementById('form-distributor-record-type')?.value || 'contracted',
+        commercialStartDate: document.getElementById('form-distributor-commercial-start')?.value || null,
         whatsappNumber: document.getElementById('form-distributor-whatsapp').value.trim(),
         category: document.getElementById('form-distributor-category').value,
         provinceCode: document.getElementById('form-distributor-province')?.value || 'ALL',
@@ -5298,17 +5616,15 @@
     }
 
     async function syncDistributorToSupabase(id, data, method = 'POST') {
-      const config = JSON.parse(localStorage.getItem('kioscoprox_ad_config') || '{}');
-      const supabaseUrl = config.supabaseUrl || config.apiUrl;
-      const supabaseKey = config.supabaseKey || config.apiKey;
+      const { baseUrl, supabaseKey } = getSupabaseConfig();
+      const token = await getValidAdminToken();
 
-      if (!supabaseUrl || !supabaseKey || supabaseKey.includes('...')) {
+      if (!baseUrl || !supabaseKey || supabaseKey.includes('...')) {
         console.warn('No credentials to sync distributor to Supabase. Saved locally.');
         return;
       }
 
       try {
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
         const filterParam = isUuid ? `id=eq.${id}` : `name=eq.${encodeURIComponent(data.name || '')}`;
         const endpoint = method === 'PATCH'
@@ -5317,6 +5633,11 @@
 
         const payload = {
           name: data.name,
+          legal_name: data.legalName || null,
+          cuit: data.cuit || null,
+          contact_name: data.contactName || null,
+          record_type: data.recordType || 'contracted',
+          commercial_start_date: data.commercialStartDate || null,
           whatsapp_number: data.whatsappNumber,
           category: data.category,
           min_purchase: data.minPurchase,
@@ -5335,7 +5656,7 @@
           method,
           headers: {
             'apikey': supabaseKey,
-            'Authorization': `Bearer ${typeof authSession !== 'undefined' && authSession ? authSession.access_token : supabaseKey}`,
+            'Authorization': `Bearer ${token || (typeof authSession !== 'undefined' && authSession ? authSession.access_token : supabaseKey)}`,
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal'
           },
@@ -5353,20 +5674,17 @@
     }
 
     async function fetchDistributorsFromSupabase() {
-      const config = JSON.parse(localStorage.getItem('kioscoprox_ad_config') || '{}');
-      const supabaseUrl = config.supabaseUrl || config.apiUrl;
-      const supabaseKey = config.supabaseKey || config.apiKey;
-
+      const { supabaseUrl, supabaseKey, baseUrl } = getSupabaseConfig();
       if (!supabaseUrl || !supabaseKey) return;
 
       try {
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
         const endpoint = baseUrl.includes('/rest/v1') 
           ? `${baseUrl}/distributors?select=*`
           : `${baseUrl}/rest/v1/distributors?select=*`;
 
+        const token = await getValidAdminToken();
         const res = await fetch(endpoint, {
-          headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${typeof authSession !== 'undefined' && authSession ? authSession.access_token : supabaseKey}` }
+          headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${token || (typeof authSession !== 'undefined' && authSession ? authSession.access_token : supabaseKey)}` }
         });
 
         if (res.ok) {
@@ -5375,10 +5693,16 @@
             distributorsList = raw.map(d => ({
               id: d.id,
               name: d.name || d.title,
+              legalName: d.legal_name || null,
+              cuit: d.cuit || null,
+              contactName: d.contact_name || null,
+              recordType: d.record_type || 'contracted',
+              commercialStartDate: d.commercial_start_date ? String(d.commercial_start_date).slice(0, 10) : null,
               whatsappNumber: d.whatsapp_number,
               category: d.category,
               minPurchase: d.min_purchase,
               conditions: d.conditions,
+              notes: d.notes || null,
               provinceCode: d.province_code || d.provinceCode || 'ALL',
               city: d.city || null,
               deleted: d.deleted || false
@@ -5402,6 +5726,1040 @@
       }
     }
 
+    // =========================================================================
+    // MÓDULO B2B COMERCIAL: MAYORISTAS, CONTRATOS, CUOTAS Y PAGOS
+    // =========================================================================
+    let contractsList = [];
+    let invoicesList = [];
+    let paymentsList = [];
+    let activeProfileDistributorId = null;
+    let paymentSubmissionInFlight = false;
+
+    // Helper para obtener la configuración y URL base de Supabase con fallbacks seguros
+    function getSupabaseConfig() {
+      let config = {};
+      try {
+        config = JSON.parse(localStorage.getItem('kioscoprox_ad_config') || '{}');
+      } catch(e) {}
+
+      const defaultUrl = 'https://qtixbiikhvhzwshfgyeo.supabase.co';
+      const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0aXhiaWlraHVoendzaGZneWVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2MTU1OTIsImV4cCI6MjEwMzE5MTU5Mn0.VxLd2eJChGHmTDuQT72mtHILUC6iWDAUVgH4ak1OHHE';
+
+      const inputUrl = typeof document !== 'undefined' && document.getElementById('api-url-input') ? document.getElementById('api-url-input').value.trim() : '';
+      const inputKey = typeof document !== 'undefined' && document.getElementById('api-key-input') ? document.getElementById('api-key-input').value.trim() : '';
+
+      const supabaseUrl = config.supabaseUrl || config.apiUrl || inputUrl || defaultUrl;
+      const supabaseKey = config.supabaseKey || config.apiKey || inputKey || defaultKey;
+      const baseUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+
+      return { supabaseUrl, supabaseKey, baseUrl };
+    }
+
+    // Resuelve el token de sesión de Supabase Auth para peticiones administrativas
+    async function getValidAdminToken() {
+      if (typeof authSession !== 'undefined' && authSession && authSession.access_token) {
+        return authSession.access_token;
+      }
+      if (typeof initSupabase === 'function') {
+        initSupabase();
+      }
+      if (typeof supabaseClient !== 'undefined' && supabaseClient && supabaseClient.auth) {
+        try {
+          const { data } = await supabaseClient.auth.getSession();
+          if (data && data.session && data.session.access_token) {
+            authSession = data.session;
+            return data.session.access_token;
+          }
+        } catch(e) {}
+      }
+      return null;
+    }
+
+    // A. Cargar datos financieros desde Supabase
+    async function loadFinanceData(force = false) {
+      const tbody = document.getElementById('finance-table-body');
+      const refreshBtn = document.getElementById('btn-finance-refresh');
+      const originalBtnHtml = refreshBtn ? refreshBtn.innerHTML : '<i data-lucide="refresh-cw"></i> Actualizar';
+
+      const { supabaseUrl, supabaseKey, baseUrl } = getSupabaseConfig();
+
+      if (!supabaseUrl || !supabaseKey) {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--danger);">Configuración de Supabase no disponible. Revise la pestaña Configuración API.</td></tr>';
+        }
+        if (refreshBtn) {
+          refreshBtn.innerHTML = '<span style="color: var(--danger); font-size: 11.5px;">Configuración ausente</span>';
+          setTimeout(() => {
+            if (refreshBtn) {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalBtnHtml;
+              if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+          }, 2500);
+        }
+        return;
+      }
+
+      const token = await getValidAdminToken();
+      if (!token) {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">Inicie sesión como administrador para consultar el módulo financiero.</td></tr>';
+        }
+        if (refreshBtn) {
+          refreshBtn.innerHTML = '<span style="color: var(--danger); font-size: 11.5px;">Sin sesión activa</span>';
+          setTimeout(() => {
+            if (refreshBtn) {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalBtnHtml;
+              if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+          }, 2500);
+        }
+        return;
+      }
+
+      // Feedback visual: deshabilitar e indicar actualización en curso
+      if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i data-lucide="loader-2" class="spin"></i> Actualizando...';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+
+      const headers = { 'apikey': supabaseKey, 'Authorization': 'Bearer ' + token };
+
+      try {
+        // Refrescar distribuidores si force === true o si la lista local está vacía
+        if (force || distributorsList.length === 0) {
+          await fetchDistributorsFromSupabase();
+        }
+
+        // Consultar contratos, cuotas y pagos en paralelo
+        const [cRes, iRes, pRes] = await Promise.all([
+          fetch(baseUrl + '/rest/v1/distributor_contracts?select=*', { headers }),
+          fetch(baseUrl + '/rest/v1/distributor_invoices?select=*&order=due_date.asc', { headers }),
+          fetch(baseUrl + '/rest/v1/distributor_payments?select=*&order=payment_date.desc', { headers })
+        ]);
+
+        if (!cRes.ok || !iRes.ok || !pRes.ok) {
+          throw new Error(`Respuesta no satisfactoria (Contratos: ${cRes.status}, Cuotas: ${iRes.status}, Pagos: ${pRes.status})`);
+        }
+
+        // Solo sustituir las variables de memoria tras validar que todas las consultas fueron exitosas
+        contractsList = await cRes.json();
+        invoicesList = await iRes.json();
+        paymentsList = await pRes.json();
+
+        updateFinanceSummary();
+        populateFinanceDistributorFilter();
+        renderFinanceTable();
+
+        if (refreshBtn) {
+          refreshBtn.innerHTML = '<span style="color: #10b981; font-weight: 700;">✓ Actualizado</span>';
+          setTimeout(() => {
+            if (refreshBtn) {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalBtnHtml;
+              if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+          }, 1500);
+        }
+      } catch (err) {
+        console.warn('Error al cargar datos financieros:', err);
+        // Si no había datos previos en memoria, mostrar mensaje en la tabla
+        if (tbody && invoicesList.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--danger);">Error al conectar con la base de datos financiera. Reintente más tarde.</td></tr>';
+        }
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = '<span style="color: var(--danger); font-size: 11.5px;">Error al actualizar</span>';
+          setTimeout(() => {
+            if (refreshBtn) {
+              refreshBtn.innerHTML = originalBtnHtml;
+              if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+          }, 2500);
+        }
+      }
+    }
+
+    // B. Actualizar tarjetas de resumen financiero
+    // Helper: identifica inequívocamente si un mayorista es de prueba/técnico (QA)
+    // Criterio explícito del esquema: category === 'QA_TEST' o flag estructurado en notes.
+    // Nunca busca palabras en el nombre comercial ni excluye prospectos u otros tipos legítimos.
+    function isQADistributor(distId) {
+      if (!distId) return false;
+      const d = distributorsList.find(x => x.id === distId);
+      if (!d) return false;
+      const cat = (d.category || '').toUpperCase().trim();
+      const notes = d.notes || '';
+      return cat === 'QA_TEST' || cat === 'QA' || notes.includes('<!--B2B_IS_QA:true-->');
+    }
+
+    function updateFinanceSummary() {
+      const now = new Date();
+      const currentMonth = now.toISOString().slice(0, 7); // 'YYYY-MM'
+      const todayStr = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+      let billedThisMonth = 0;
+      let collectedThisMonth = 0;
+      let totalPending = 0;
+      let overdueCount = 0;
+      let overdueAmount = 0;
+
+      invoicesList.forEach(inv => {
+        // Excluir inequívocamente registros QA de los KPIs comerciales globales
+        if (isQADistributor(inv.distributor_id)) return;
+
+        const orig = Number(inv.amount_original || 0);
+        const paid = Number(inv.amount_paid || 0);
+        const bal = Math.max(0, orig - paid);
+        const due = inv.due_date ? String(inv.due_date).slice(0, 10) : '';
+
+        // Facturado en el mes actual
+        if (due.startsWith(currentMonth)) {
+          billedThisMonth += orig;
+        }
+
+        // Saldo pendiente total
+        totalPending += bal;
+
+        // Vencidas con saldo remanente
+        if (bal > 0 && due && due < todayStr) {
+          overdueCount++;
+          overdueAmount += bal;
+        }
+      });
+
+      // Cobrado en el mes actual según pagos efectivos
+      paymentsList.forEach(p => {
+        // Resolver mayorista directo o a través de la cuota asociada
+        const distId = p.distributor_id || (invoicesList.find(i => i.id === p.invoice_id)?.distributor_id);
+        if (isQADistributor(distId)) return;
+
+        const pDate = p.payment_date ? String(p.payment_date).slice(0, 7) : '';
+        if (pDate === currentMonth) {
+          collectedThisMonth += Number(p.amount || 0);
+        }
+      });
+
+      const elBilled = document.getElementById('finance-stat-billed');
+      if (elBilled) elBilled.innerText = '$' + billedThisMonth.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+      const elCollected = document.getElementById('finance-stat-collected');
+      if (elCollected) elCollected.innerText = '$' + collectedThisMonth.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+      const elPending = document.getElementById('finance-stat-pending');
+      if (elPending) elPending.innerText = '$' + totalPending.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+      const elOverdue = document.getElementById('finance-stat-overdue');
+      if (elOverdue) elOverdue.innerText = overdueCount + ' ($' + overdueAmount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ')';
+    }
+
+    // C. Llenar filtro de mayoristas en finanzas
+    function populateFinanceDistributorFilter() {
+      const select = document.getElementById('finance-filter-distributor');
+      if (!select) return;
+      const currentVal = select.value;
+      select.innerHTML = '<option value="all">🏢 Todos los mayoristas</option>';
+
+      distributorsList.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        select.appendChild(opt);
+      });
+
+      if (currentVal) select.value = currentVal;
+    }
+
+    // D. Renderizar tabla de cuotas
+    function renderFinanceTable() {
+      const tbody = document.getElementById('finance-table-body');
+      const counter = document.getElementById('finance-header-counter');
+      if (!tbody) return;
+
+      const filterDist = document.getElementById('finance-filter-distributor')?.value || 'all';
+      const filterStatus = document.getElementById('finance-filter-status')?.value || 'all';
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      let filtered = invoicesList.filter(inv => {
+        if (filterDist !== 'all' && inv.distributor_id !== filterDist) return false;
+        const orig = Number(inv.amount_original || 0);
+        const paid = Number(inv.amount_paid || 0);
+        const bal = orig - paid;
+        const isOverdue = bal > 0 && inv.due_date && String(inv.due_date).slice(0, 10) < todayStr;
+
+        if (filterStatus === 'pending') return paid === 0 && !isOverdue;
+        if (filterStatus === 'partial') return paid > 0 && bal > 0 && !isOverdue;
+        if (filterStatus === 'paid') return bal === 0;
+        if (filterStatus === 'overdue') return isOverdue;
+
+        return true;
+      });
+
+      if (counter) counter.innerText = filtered.length + ' cuotas';
+
+      if (filtered.length === 0) {
+        const emptyMsg = invoicesList.length === 0 
+          ? 'No hay cuotas registradas.' 
+          : 'No se encontraron cuotas con los filtros seleccionados.';
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">${emptyMsg}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      filtered.forEach(inv => {
+        const dist = distributorsList.find(d => d.id === inv.distributor_id) || { name: 'Mayorista ' + inv.distributor_id };
+        const orig = Number(inv.amount_original || 0);
+        const paid = Number(inv.amount_paid || 0);
+        const bal = Math.max(0, orig - paid);
+        const due = inv.due_date ? String(inv.due_date).slice(0, 10) : '-';
+        const isOverdue = bal > 0 && due !== '-' && due < todayStr;
+
+        let statusBadge = '';
+        if (bal === 0) {
+          statusBadge = '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700;">🟢 Pagada</span>';
+        } else if (isOverdue) {
+          const partialNote = paid > 0 ? (' (Parcial: $' + paid.toLocaleString('es-AR') + ')') : '';
+          statusBadge = '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: 700;" title="Vencida el ' + due + '. Saldo: $' + bal.toLocaleString('es-AR') + '">🔴 Vencida' + partialNote + '</span>';
+        } else if (paid > 0) {
+          statusBadge = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-weight: 700;">🟡 Parcial</span>';
+        } else {
+          statusBadge = '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; font-weight: 600;">⏳ Pendiente</span>';
+        }
+
+        const safeDistId = String(inv.distributor_id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+        const safeDistName = String(dist.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <button type="button" class="btn-link" onclick="openDistributorProfileModal('${safeDistId}')" title="Ver Ficha B2B y Acuerdos de ${safeDistName}" style="background: none; border: none; padding: 0; margin: 0; text-align: left; font-size: 13px; font-weight: 700; color: #38bdf8; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; text-decoration: underline; text-underline-offset: 3px;">
+              <span>${safeDistName}</span>
+              <i data-lucide="file-text" style="width: 13px; height: 13px; opacity: 0.85;"></i>
+            </button>
+            ${dist.cuit ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">CUIT: ${dist.cuit}</div>` : ''}
+          </td>
+          <td>${inv.period_label || '-'}</td>
+          <td style="text-align: center; font-size: 12px; color: ${isOverdue ? '#ef4444' : '#cbd5e1'}; font-weight: ${isOverdue ? '700' : 'normal'};">
+            ${due} ${isOverdue ? '⚠️' : ''}
+          </td>
+          <td style="text-align: right; font-weight: 600;">$${orig.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          <td style="text-align: right; color: #10b981;">$${paid.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          <td style="text-align: right; font-weight: 700; color: ${bal > 0 ? '#f59e0b' : '#10b981'};">$${bal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          <td style="text-align: center;">${statusBadge}</td>
+          <td style="text-align: center; white-space: nowrap;">
+            ${bal > 0 ? `<button class="btn btn-sm btn-primary" onclick="openCreatePaymentModal('${inv.id}')" style="font-size: 11.5px; padding: 4px 10px;">💵 Cobrar</button>` : '<span style="color: #10b981; font-size: 11.5px; font-weight: 600;">✓ Saldado</span>'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    // E. Modal Registrar Pago con Idempotencia Estricta
+    function openCreatePaymentModal(invoiceId) {
+      if (paymentSubmissionInFlight) {
+        alert('Hay una operación de pago en curso. Espere su finalización.');
+        return;
+      }
+      const inv = invoicesList.find(i => i.id === invoiceId);
+      if (!inv) return;
+      const dist = distributorsList.find(d => d.id === inv.distributor_id) || { name: 'Mayorista' };
+      const orig = Number(inv.amount_original || 0);
+      const paid = Number(inv.amount_paid || 0);
+      const bal = Math.max(0, orig - paid);
+
+      // Clave de Idempotencia ÚNICA generada al abrir la operación
+      const uniqueIdempotencyKey = 'pay_' + inv.id + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+
+      document.getElementById('pay-invoice-id').value = inv.id;
+      document.getElementById('pay-distributor-id').value = inv.distributor_id;
+      document.getElementById('pay-idempotency-key').value = uniqueIdempotencyKey;
+      document.getElementById('pay-invoice-title').innerText = dist.name + ' — ' + (inv.period_label || 'Pauta');
+      document.getElementById('pay-pending-balance').innerText = '$' + bal.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+      
+      const amtInput = document.getElementById('pay-amount');
+      amtInput.value = bal.toFixed(2);
+      amtInput.max = bal.toFixed(2);
+      document.getElementById('pay-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('pay-reference').value = '';
+      document.getElementById('pay-notes').value = '';
+      document.getElementById('pay-amount-error').style.display = 'none';
+
+      const btn = document.getElementById('btn-submit-payment');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="check"></i> Confirmar Pago';
+      }
+
+      document.getElementById('payment-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePaymentModal() {
+      if (paymentSubmissionInFlight) {
+        alert('Operación en curso. Por favor espere.');
+        return;
+      }
+      document.getElementById('payment-modal').classList.add('hidden');
+    }
+
+    function validatePaymentAmount() {
+      const amtInput = document.getElementById('pay-amount');
+      const errDiv = document.getElementById('pay-amount-error');
+      const btn = document.getElementById('btn-submit-payment');
+      const val = parseFloat(amtInput.value);
+      const maxVal = parseFloat(amtInput.max);
+
+      if (isNaN(val) || val <= 0) {
+        errDiv.innerText = 'El monto debe ser un valor positivo mayor a 0.';
+        errDiv.style.display = 'block';
+        btn.disabled = true;
+        return false;
+      }
+      if (val > (maxVal + 0.001)) {
+        errDiv.innerText = 'El monto no puede superar el saldo pendiente ($' + maxVal.toLocaleString('es-AR', { minimumFractionDigits: 2 }) + ').';
+        errDiv.style.display = 'block';
+        btn.disabled = true;
+        return false;
+      }
+
+      errDiv.style.display = 'none';
+      if (!paymentSubmissionInFlight) btn.disabled = false;
+      return true;
+    }
+
+    async function handleSavePayment(e) {
+      e.preventDefault();
+      if (paymentSubmissionInFlight) return; // Anti-doble clic
+      if (!validatePaymentAmount()) return;
+
+      const invoiceId = document.getElementById('pay-invoice-id').value;
+      const distributorId = document.getElementById('pay-distributor-id').value;
+      const amount = parseFloat(document.getElementById('pay-amount').value);
+      const paymentMethod = document.getElementById('pay-method').value;
+      const paymentDate = document.getElementById('pay-date').value;
+      const referenceCode = document.getElementById('pay-reference').value.trim();
+      const notes = document.getElementById('pay-notes').value.trim();
+      
+      // REUTILIZA EXACTAMENTE LA CLAVE GENERADA AL INICIO (Idempotencia real)
+      const idempotencyKey = document.getElementById('pay-idempotency-key').value;
+
+      const btn = document.getElementById('btn-submit-payment');
+      paymentSubmissionInFlight = true;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Procesando Pago...';
+
+      const token = await getValidAdminToken();
+      if (!token) {
+        alert('Debe iniciar sesión como administrador para registrar cobros.');
+        paymentSubmissionInFlight = false;
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="check"></i> Confirmar Pago';
+        return;
+      }
+
+      const { baseUrl, supabaseKey } = getSupabaseConfig();
+
+      const payload = {
+        invoice_id: invoiceId,
+        distributor_id: distributorId,
+        amount: amount,
+        payment_method: paymentMethod,
+        payment_date: paymentDate,
+        reference_code: referenceCode || null,
+        notes: notes || null,
+        idempotency_key: idempotencyKey
+      };
+
+      try {
+        const res = await fetch(baseUrl + '/rest/v1/distributor_payments', {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok || res.status === 201) {
+          alert('✅ Pago registrado correctamente y saldo de cuota actualizado.');
+          paymentSubmissionInFlight = false;
+          closePaymentModal();
+          await loadFinanceData();
+          if (activeProfileDistributorId) {
+            openDistributorProfileModal(activeProfileDistributorId);
+          }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.message || res.statusText;
+          
+          // Detección de colisión de idempotencia (el pago ya fue registrado)
+          if (errMsg.includes('duplicate key') || errMsg.includes('idempotency_key') || res.status === 409) {
+            alert('ℹ️ Este cobro ya fue procesado y registrado previamente en el servidor.');
+            paymentSubmissionInFlight = false;
+            closePaymentModal();
+            await loadFinanceData();
+            return;
+          }
+
+          alert('Error al registrar pago: ' + errMsg);
+          paymentSubmissionInFlight = false;
+          btn.disabled = false;
+          btn.innerHTML = '🔄 Reintentar Cobro';
+        }
+      } catch (err) {
+        // En caso de fallo de red ambiguo: verificar si el servidor llegó a procesarlo
+        try {
+          const verifyRes = await fetch(baseUrl + '/rest/v1/distributor_payments?idempotency_key=eq.' + encodeURIComponent(idempotencyKey), {
+            headers: { 'apikey': supabaseKey, 'Authorization': 'Bearer ' + token }
+          });
+          if (verifyRes.ok) {
+            const existing = await verifyRes.json();
+            if (Array.isArray(existing) && existing.length > 0) {
+              alert('✅ Operación confirmada: El pago fue acreditado exitosamente en el servidor a pesar de la lentitud de red.');
+              paymentSubmissionInFlight = false;
+              closePaymentModal();
+              await loadFinanceData();
+              return;
+            }
+          }
+        } catch(e) {}
+
+        alert('Error de conexión con el servidor: ' + err.message + '\n\nPuede presionar "Reintentar Cobro" para reintentar con la misma clave de idempotencia sin riesgo de duplicación.');
+        paymentSubmissionInFlight = false;
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Reintentar Cobro';
+      }
+    }
+
+    // F. Modal Nueva Cuota
+    function openCreateInvoiceModal(preselectedDistId = null) {
+      const select = document.getElementById('inv-distributor-id');
+      select.innerHTML = '<option value="">Seleccionar mayorista...</option>';
+      distributorsList.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        select.appendChild(opt);
+      });
+
+      if (preselectedDistId) {
+        select.value = preselectedDistId;
+        handleInvoiceDistributorChange(preselectedDistId);
+      }
+
+      const today = new Date();
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      document.getElementById('inv-period-label').value = monthNames[today.getMonth()] + ' ' + today.getFullYear();
+      
+      const due = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
+      document.getElementById('inv-due-date').value = due.toISOString().slice(0, 10);
+      document.getElementById('inv-amount').value = '';
+      document.getElementById('inv-notes').value = '';
+
+      document.getElementById('invoice-modal').classList.remove('hidden');
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoice-modal').classList.add('hidden');
+    }
+
+    function handleInvoiceDistributorChange(distId) {
+      const cSelect = document.getElementById('inv-contract-id');
+      cSelect.innerHTML = '<option value="">Pauta puntual / Sin acuerdo marco</option>';
+      const distContracts = contractsList.filter(c => c.distributor_id === distId);
+      distContracts.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.title + ' ($' + Number(c.contract_amount || 0).toLocaleString('es-AR') + ')';
+        cSelect.appendChild(opt);
+      });
+      if (distContracts.length > 0) {
+        cSelect.value = distContracts[0].id;
+        document.getElementById('inv-amount').value = distContracts[0].contract_amount;
+      }
+    }
+
+    async function handleSaveInvoice(e) {
+      e.preventDefault();
+      const distId = document.getElementById('inv-distributor-id').value;
+      const contractId = document.getElementById('inv-contract-id').value || null;
+      const periodLabel = document.getElementById('inv-period-label').value.trim();
+      const dueDate = document.getElementById('inv-due-date').value;
+      const amount = parseFloat(document.getElementById('inv-amount').value);
+      const notes = document.getElementById('inv-notes').value.trim();
+
+      if (!distId || !periodLabel || !dueDate || isNaN(amount) || amount <= 0) {
+        alert('Complete todos los campos obligatorios con valores válidos.');
+        return;
+      }
+
+      const token = await getValidAdminToken();
+      if (!token) return;
+
+      const { baseUrl, supabaseKey } = getSupabaseConfig();
+
+      const payload = {
+        distributor_id: distId,
+        contract_id: contractId,
+        period_label: periodLabel,
+        due_date: dueDate,
+        amount_original: amount,
+        amount_paid: 0.00,
+        status: 'pending',
+        notes: notes || null
+      };
+
+      try {
+        const res = await fetch(baseUrl + '/rest/v1/distributor_invoices', {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok || res.status === 201) {
+          alert('✅ Cuota emitida correctamente.');
+          closeInvoiceModal();
+          await loadFinanceData();
+          if (activeProfileDistributorId) {
+            openDistributorProfileModal(activeProfileDistributorId);
+          }
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert('Error al emitir cuota: ' + (err.message || res.statusText));
+        }
+      } catch (err) {
+        alert('Error de conexión: ' + err.message);
+      }
+    }
+
+    // G. Modal Nuevo Contrato
+    function openCreateContractModal(preselectedDistId = null) {
+      const select = document.getElementById('contract-distributor-id');
+      select.innerHTML = '<option value="">Seleccionar mayorista...</option>';
+      distributorsList.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        select.appendChild(opt);
+      });
+
+      if (preselectedDistId) select.value = preselectedDistId;
+      document.getElementById('contract-title').value = 'Abono Mensual Banners POS';
+      document.getElementById('contract-amount').value = '';
+      document.getElementById('contract-start-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('contract-end-date').value = '';
+      document.getElementById('contract-notes').value = '';
+
+      document.getElementById('contract-modal').classList.remove('hidden');
+    }
+
+    function closeContractModal() {
+      document.getElementById('contract-modal').classList.add('hidden');
+    }
+
+    async function handleSaveContract(e) {
+      e.preventDefault();
+      const distId = document.getElementById('contract-distributor-id').value;
+      const title = document.getElementById('contract-title').value.trim();
+      const amount = parseFloat(document.getElementById('contract-amount').value);
+      const frequency = document.getElementById('contract-frequency').value;
+      const startDate = document.getElementById('contract-start-date').value;
+      const endDate = document.getElementById('contract-end-date').value || null;
+      const notes = document.getElementById('contract-notes').value.trim();
+
+      if (!distId || !title || isNaN(amount) || amount < 0 || !startDate) {
+        alert('Complete todos los campos obligatorios con valores válidos.');
+        return;
+      }
+
+      const token = await getValidAdminToken();
+      if (!token) return;
+
+      const { baseUrl, supabaseKey } = getSupabaseConfig();
+
+      const payload = {
+        distributor_id: distId,
+        title: title,
+        contract_amount: amount,
+        billing_frequency: frequency,
+        start_date: startDate,
+        end_date: endDate,
+        status: 'active',
+        notes: notes || null
+      };
+
+      try {
+        const res = await fetch(baseUrl + '/rest/v1/distributor_contracts', {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok || res.status === 201) {
+          alert('✅ Acuerdo comercial registrado correctamente.');
+          closeContractModal();
+          await loadFinanceData();
+          if (activeProfileDistributorId) {
+            openDistributorProfileModal(activeProfileDistributorId);
+          }
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert('Error al registrar acuerdo: ' + (err.message || res.statusText));
+        }
+      } catch (err) {
+        alert('Error de conexión: ' + err.message);
+      }
+    }
+
+    // H. Ficha Comercial Integral
+    function openDistributorProfileModal(distId) {
+      activeProfileDistributorId = distId;
+      const dist = distributorsList.find(d => d.id === distId);
+      if (!dist) return;
+
+      document.getElementById('profile-dist-name').innerText = dist.name;
+      
+      const typeBadge = document.getElementById('profile-record-type-badge');
+      if (dist.recordType === 'catalog_example') {
+        typeBadge.innerText = '📦 Catálogo / Referencia';
+        typeBadge.className = 'badge';
+        typeBadge.style = 'background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 11px;';
+      } else if (dist.recordType === 'prospect') {
+        typeBadge.innerText = '🟠 Prospecto';
+        typeBadge.className = 'badge';
+        typeBadge.style = 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 11px;';
+      } else {
+        typeBadge.innerText = '🟢 Mayorista Contratado';
+        typeBadge.className = 'badge';
+        typeBadge.style = 'background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; font-size: 11px;';
+      }
+
+      const statusBadge = document.getElementById('profile-status-badge');
+      statusBadge.innerText = dist.status === 'paused' ? 'En Pausa' : (dist.status === 'inactive' ? 'Inactivo' : 'Activo');
+      statusBadge.style = 'background: rgba(255, 255, 255, 0.08); color: #cbd5e1; font-size: 11px;';
+
+      const cuitText = dist.cuit ? ('CUIT: ' + dist.cuit) : 'Sin CUIT';
+      const startText = dist.commercialStartDate ? ('Inicio: ' + dist.commercialStartDate) : 'Inicio: No definido';
+      const contactText = dist.contactName ? (' • Responsable: ' + dist.contactName) : '';
+      document.getElementById('profile-dist-sub').innerText = cuitText + ' • ' + startText + contactText + ' • WhatsApp: ' + (dist.whatsappNumber || '-');
+
+      // Calcular totales del mayorista
+      const myInvoices = invoicesList.filter(i => i.distributor_id === distId);
+      const myContracts = contractsList.filter(c => c.distributor_id === distId);
+      const myPayments = paymentsList.filter(p => p.distributor_id === distId);
+
+      let totalContracted = 0;
+      let totalPaid = 0;
+      myInvoices.forEach(i => {
+        totalContracted += Number(i.amount_original || 0);
+        totalPaid += Number(i.amount_paid || 0);
+      });
+      const balance = Math.max(0, totalContracted - totalPaid);
+
+      document.getElementById('profile-stat-contracted').innerText = '$' + totalContracted.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+      document.getElementById('profile-stat-paid').innerText = '$' + totalPaid.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+      document.getElementById('profile-stat-balance').innerText = '$' + balance.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+
+      // Renderizar Acuerdos
+      const cContainer = document.getElementById('profile-contracts-container');
+      if (myContracts.length === 0) {
+        cContainer.innerHTML = '<div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 10px;">No posee contratos registrados.</div>';
+      } else {
+        cContainer.innerHTML = myContracts.map(c => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(30, 41, 59, 0.5); border-radius: 6px; margin-bottom: 6px; font-size: 12.5px;">
+            <div>
+              <strong style="color: #ffffff;">${c.title}</strong>
+              <div style="font-size: 11px; color: #94a3b8;">${c.billing_frequency === 'monthly' ? 'Mensual' : c.billing_frequency} • Desde: ${c.start_date || '-'} ${c.end_date ? 'hasta ' + c.end_date : ''}</div>
+            </div>
+            <div style="font-weight: 700; color: #38bdf8;">$${Number(c.contract_amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+          </div>
+        `).join('');
+      }
+
+      // Renderizar Cuotas y Pagos
+      const iContainer = document.getElementById('profile-invoices-container');
+      if (myInvoices.length === 0) {
+        iContainer.innerHTML = '<div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 10px;">No posee cuotas emitidas.</div>';
+      } else {
+        iContainer.innerHTML = myInvoices.map(i => {
+          const orig = Number(i.amount_original || 0);
+          const paid = Number(i.amount_paid || 0);
+          const bal = Math.max(0, orig - paid);
+          const myInvPayments = myPayments.filter(p => p.invoice_id === i.id);
+
+          return `
+            <div style="padding: 10px 12px; background: rgba(30, 41, 59, 0.5); border-radius: 6px; margin-bottom: 8px; font-size: 12.5px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong style="color: #ffffff;">${i.period_label || 'Cuota'}</strong>
+                  <span style="font-size: 11px; color: #94a3b8; margin-left: 8px;">Vence: ${i.due_date || '-'}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="color: #cbd5e1;">Total: <strong>$${orig.toLocaleString('es-AR')}</strong></span>
+                  <span style="color: #10b981;">Cobrado: <strong>$${paid.toLocaleString('es-AR')}</strong></span>
+                  <span style="color: ${bal > 0 ? '#f59e0b' : '#10b981'}; font-weight: 700;">Saldo: $${bal.toLocaleString('es-AR')}</span>
+                  ${bal > 0 ? `<button class="btn btn-sm btn-primary" onclick="openCreatePaymentModal('${i.id}')" style="font-size: 11px; padding: 2px 8px;">💵 Cobrar</button>` : '<span style="color: #10b981; font-size: 11px;">✓</span>'}
+                </div>
+              </div>
+              ${myInvPayments.length > 0 ? `
+                <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08); font-size: 11px; color: #94a3b8;">
+                  ${myInvPayments.map(p => '• Pago de $' + Number(p.amount).toLocaleString('es-AR') + ' el ' + p.payment_date + ' (' + p.payment_method + (p.reference_code ? ' - Ref: ' + p.reference_code : '') + ')').join('<br>')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('distributor-profile-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeDistributorProfileModal() {
+      document.getElementById('distributor-profile-modal').classList.add('hidden');
+      activeProfileDistributorId = null;
+    }
+
+    function openCreateContractForCurrentDistributor() {
+      if (activeProfileDistributorId) openCreateContractModal(activeProfileDistributorId);
+    }
+
+    function openCreateInvoiceForCurrentDistributor() {
+      if (activeProfileDistributorId) openCreateInvoiceModal(activeProfileDistributorId);
+    }
+
+    // I. Importación Controlada del Catálogo de Referencia
+    let catalogReferenceItems = [];
+
+    async function openImportCatalogModal() {
+      try {
+        const res = await fetch('../public/b2b_distributors.json');
+        if (res.ok) {
+          catalogReferenceItems = await res.json();
+        } else {
+          catalogReferenceItems = fallbackDistributors;
+        }
+      } catch(e) {
+        catalogReferenceItems = fallbackDistributors;
+      }
+
+      const listContainer = document.getElementById('import-catalog-items-list');
+      listContainer.innerHTML = catalogReferenceItems.map((item, idx) => `
+        <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" class="import-catalog-check" data-idx="${idx}" checked>
+            <div>
+              <strong style="color: #ffffff;">${item.name}</strong>
+              <div style="font-size: 11px; color: #94a3b8;">${item.category || 'General'} • ${item.city || 'Nacional'}</div>
+            </div>
+          </div>
+          <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 10.5px;">📦 Catálogo / Referencia</span>
+        </label>
+      `).join('');
+
+      document.getElementById('import-catalog-modal').classList.remove('hidden');
+    }
+
+    function closeImportCatalogModal() {
+      document.getElementById('import-catalog-modal').classList.add('hidden');
+    }
+
+    function toggleSelectAllCatalog(checked) {
+      document.querySelectorAll('.import-catalog-check').forEach(ch => ch.checked = checked);
+    }
+
+    async function executeControlledCatalogImport() {
+      const selected = [];
+      document.querySelectorAll('.import-catalog-check:checked').forEach(ch => {
+        const idx = parseInt(ch.getAttribute('data-idx'));
+        if (catalogReferenceItems[idx]) selected.push(catalogReferenceItems[idx]);
+      });
+
+      if (selected.length === 0) {
+        alert('Seleccione al menos un distribuidor para importar.');
+        return;
+      }
+
+      const token = await getValidAdminToken();
+      if (!token) {
+        alert('Debe iniciar sesión como administrador.');
+        return;
+      }
+
+      const { baseUrl, supabaseKey } = getSupabaseConfig();
+
+      let imported = 0;
+      for (const item of selected) {
+        const payload = {
+          id: item.id,
+          name: item.name,
+          whatsapp_number: item.whatsappNumber,
+          category: item.category || 'General',
+          min_purchase: item.minPurchase || 0,
+          conditions: item.conditions || null,
+          province_code: item.provinceCode || 'ALL',
+          city: item.city || null,
+          record_type: 'catalog_example', // Requisito 1: Etiquetado explícito como catálogo
+          status: 'active',
+          commercial_start_date: null,
+          deleted: false
+        };
+
+        try {
+          const res = await fetch(baseUrl + '/rest/v1/distributors', {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=ignore-duplicates'
+            },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok || res.status === 201) imported++;
+        } catch(e) {}
+      }
+
+      alert('✅ Importación finalizada: ' + imported + ' distribuidores agregados al catálogo de referencia en Supabase.');
+      closeImportCatalogModal();
+      await fetchDistributorsFromSupabase();
+      renderDistributors();
+    }
+
+    // J. Detección y Revisión de LocalStorage
+    function checkLocalStorageDistributorsBanner() {
+      const banner = document.getElementById('distributors-local-cache-banner');
+      if (!banner) return;
+      try {
+        const raw = localStorage.getItem('kioscoprox_distributors_cache');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            banner.style.display = 'flex';
+            return;
+          }
+        }
+      } catch(e) {}
+      banner.style.display = 'none';
+    }
+
+    function dismissLocalCacheBanner() {
+      const banner = document.getElementById('distributors-local-cache-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    function openReviewLocalStorageModal() {
+      let cached = [];
+      try {
+        cached = JSON.parse(localStorage.getItem('kioscoprox_distributors_cache') || '[]');
+      } catch(e) {}
+
+      const listContainer = document.getElementById('review-local-items-list');
+      listContainer.innerHTML = cached.map((d, idx) => `
+        <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" class="local-import-check" data-idx="${idx}" checked>
+            <div>
+              <strong style="color: #ffffff;">${d.name}</strong>
+              <div style="font-size: 11px; color: #94a3b8;">WhatsApp: ${d.whatsappNumber || '-'} • ${d.city || 'Nacional'}</div>
+            </div>
+          </div>
+          <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 10.5px;">Caché Local</span>
+        </label>
+      `).join('');
+
+      document.getElementById('review-local-distributors-modal').classList.remove('hidden');
+    }
+
+    function closeReviewLocalModal() {
+      document.getElementById('review-local-distributors-modal').classList.add('hidden');
+    }
+
+    function clearLocalStorageDistributors() {
+      if (confirm('¿Descartar los distribuidores guardados en la memoria local de este navegador?')) {
+        localStorage.removeItem('kioscoprox_distributors_cache');
+        closeReviewLocalModal();
+        dismissLocalCacheBanner();
+        alert('Caché local eliminada.');
+      }
+    }
+
+    async function executeControlledLocalImport() {
+      let cached = [];
+      try {
+        cached = JSON.parse(localStorage.getItem('kioscoprox_distributors_cache') || '[]');
+      } catch(e) {}
+
+      const selected = [];
+      document.querySelectorAll('.local-import-check:checked').forEach(ch => {
+        const idx = parseInt(ch.getAttribute('data-idx'));
+        if (cached[idx]) selected.push(cached[idx]);
+      });
+
+      if (selected.length === 0) {
+        alert('Seleccione al menos un distribuidor para migrar.');
+        return;
+      }
+
+      const token = await getValidAdminToken();
+      if (!token) return;
+
+      const { baseUrl, supabaseKey } = getSupabaseConfig();
+
+      let migrated = 0;
+      for (const item of selected) {
+        const payload = {
+          name: item.name,
+          whatsapp_number: item.whatsappNumber,
+          category: item.category || 'General',
+          min_purchase: item.minPurchase || 0,
+          conditions: item.conditions || null,
+          province_code: item.provinceCode || 'ALL',
+          city: item.city || null,
+          record_type: 'contracted',
+          status: 'active',
+          deleted: false
+        };
+
+        try {
+          const res = await fetch(baseUrl + '/rest/v1/distributors', {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=ignore-duplicates'
+            },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok || res.status === 201) migrated++;
+        } catch(e) {}
+      }
+
+      alert('✅ Migración completada: ' + migrated + ' distribuidores guardados en Supabase.');
+      localStorage.removeItem('kioscoprox_distributors_cache');
+      closeReviewLocalModal();
+      dismissLocalCacheBanner();
+      await fetchDistributorsFromSupabase();
+      renderDistributors();
+    }
+
+
     // Inicializar al cargar
     (async function init() {
       lucide.createIcons();
@@ -5415,5 +6773,305 @@
       if (typeof syncAllPickerButtons === 'function') syncAllPickerButtons();
     })();
   </script>
+
+  <!-- MODAL: FICHA COMERCIAL INTEGRAL DEL MAYORISTA -->
+  <div id="distributor-profile-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 980px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+      <!-- Header Ficha -->
+      <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.95);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); display: flex; align-items: center; justify-content: center; color: #c084fc;">
+            <i data-lucide="building" style="width: 22px; height: 22px;"></i>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h3 id="profile-dist-name" style="font-size: 20px; font-weight: 800; color: #ffffff; margin: 0;">Mayorista</h3>
+              <span id="profile-record-type-badge" class="badge">Tipo</span>
+              <span id="profile-status-badge" class="badge">Estado</span>
+            </div>
+            <div id="profile-dist-sub" style="font-size: 12px; color: #94a3b8; margin-top: 4px;">CUIT: - • Inicio: -</div>
+          </div>
+        </div>
+
+        <button class="btn btn-outline" style="padding: 6px 10px;" onclick="closeDistributorProfileModal()">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <!-- Cuerpo Ficha -->
+      <div style="padding: 20px 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
+        <!-- Fila de Tarjetas Resumen del Cliente -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+          <div style="padding: 14px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border); border-radius: 10px;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Contratado</div>
+            <div style="font-size: 20px; font-weight: 800; color: #ffffff;" id="profile-stat-contracted">$0</div>
+          </div>
+          <div style="padding: 14px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border); border-radius: 10px;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Pagado</div>
+            <div style="font-size: 20px; font-weight: 800; color: #10b981;" id="profile-stat-paid">$0</div>
+          </div>
+          <div style="padding: 14px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border); border-radius: 10px;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Saldo Pendiente</div>
+            <div style="font-size: 20px; font-weight: 800; color: #f59e0b;" id="profile-stat-balance">$0</div>
+          </div>
+        </div>
+
+        <!-- Sección Acuerdos Comerciales / Contratos -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="font-size: 15px; font-weight: 700; color: #f8fafc; margin: 0;">Acuerdos Comerciales / Pautas</h4>
+            <button class="btn btn-sm btn-outline" onclick="openCreateContractForCurrentDistributor()" style="font-size: 11.5px; padding: 4px 10px;">
+              <i data-lucide="plus"></i> Nuevo Acuerdo
+            </button>
+          </div>
+          <div id="profile-contracts-container" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+            <!-- Contratos dinámicos -->
+          </div>
+        </div>
+
+        <!-- Sección Cuotas y Pagos Registrados -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="font-size: 15px; font-weight: 700; color: #f8fafc; margin: 0;">Cuotas y Cobranzas Asociadas</h4>
+            <button class="btn btn-sm btn-outline" onclick="openCreateInvoiceForCurrentDistributor()" style="font-size: 11.5px; padding: 4px 10px;">
+              <i data-lucide="plus"></i> Emitir Cuota
+            </button>
+          </div>
+          <div id="profile-invoices-container" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+            <!-- Cuotas dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR PAGO (COBRANZA) CON IDEMPOTENCIA -->
+  <div id="payment-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 18px; font-weight: 800;">Registrar Cobranza</h3>
+        <button class="btn btn-outline" style="padding: 6px;" onclick="closePaymentModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="payment-form" onsubmit="handleSavePayment(event)">
+        <input type="hidden" id="pay-invoice-id" value="">
+        <input type="hidden" id="pay-distributor-id" value="">
+        <input type="hidden" id="pay-idempotency-key" value="">
+
+        <div style="padding: 12px 16px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; margin-bottom: 16px;">
+          <div style="font-size: 11.5px; color: #94a3b8;">Cuota a Cancelar:</div>
+          <div style="font-size: 14px; font-weight: 700; color: #ffffff;" id="pay-invoice-title">-</div>
+          <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px;">
+            <span style="color: #cbd5e1;">Saldo Pendiente:</span>
+            <strong style="color: #f59e0b;" id="pay-pending-balance">$0</strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Monto a Cobrar ($ ARS) *</label>
+          <input type="number" step="0.01" min="0.01" id="pay-amount" class="form-control" placeholder="0.00" required oninput="validatePaymentAmount()">
+          <div id="pay-amount-error" style="color: #ef4444; font-size: 11px; margin-top: 4px; display: none;"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Medio de Pago *</label>
+            <select id="pay-method" class="form-control" required>
+              <option value="transferencia">Transferencia Bancaria</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="cheque">Cheque</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha de Cobro *</label>
+            <input type="date" id="pay-date" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>N° Comprobante / Referencia de Pago</label>
+          <input type="text" id="pay-reference" class="form-control" placeholder="ej. Transf. N° 49827361">
+        </div>
+
+        <div class="form-group">
+          <label>Observaciones</label>
+          <textarea id="pay-notes" class="form-control" rows="2" placeholder="Notas administrativas internas..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+          <button type="button" class="btn btn-outline" onclick="closePaymentModal()">Cancelar</button>
+          <button type="submit" id="btn-submit-payment" class="btn btn-success"><i data-lucide="check"></i> Confirmar Pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVA CUOTA / PERÍODO -->
+  <div id="invoice-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 18px; font-weight: 800;">Emitir Cuota de Publicidad</h3>
+        <button class="btn btn-outline" style="padding: 6px;" onclick="closeInvoiceModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="invoice-form" onsubmit="handleSaveInvoice(event)">
+        <div class="form-group">
+          <label>Mayorista *</label>
+          <select id="inv-distributor-id" class="form-control" required onchange="handleInvoiceDistributorChange(this.value)">
+            <option value="">Seleccionar mayorista...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Acuerdo Comercial Relacionado (Opcional)</label>
+          <select id="inv-contract-id" class="form-control">
+            <option value="">Pauta puntual / Sin acuerdo marco</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Período / Concepto *</label>
+            <input type="text" id="inv-period-label" class="form-control" placeholder="ej. Noviembre 2026" required>
+          </div>
+          <div class="form-group">
+            <label>Fecha de Vencimiento *</label>
+            <input type="date" id="inv-due-date" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Importe a Cobrar ($ ARS) *</label>
+          <input type="number" step="0.01" min="1" id="inv-amount" class="form-control" placeholder="ej. 75000" required>
+        </div>
+
+        <div class="form-group">
+          <label>Observaciones</label>
+          <textarea id="inv-notes" class="form-control" rows="2" placeholder="Detalles de la pauta contratada..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+          <button type="button" class="btn btn-outline" onclick="closeInvoiceModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="check"></i> Crear Cuota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVO CONTRATO COMERCIAL -->
+  <div id="contract-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 560px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 18px; font-weight: 800;">Nuevo Acuerdo Comercial B2B</h3>
+        <button class="btn btn-outline" style="padding: 6px;" onclick="closeContractModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="contract-form" onsubmit="handleSaveContract(event)">
+        <div class="form-group">
+          <label>Mayorista *</label>
+          <select id="contract-distributor-id" class="form-control" required>
+            <option value="">Seleccionar mayorista...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Título del Paquete / Acuerdo *</label>
+          <input type="text" id="contract-title" class="form-control" placeholder="ej. Abono Mensual 2 Banners POS" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Importe Pactado ($ ARS) *</label>
+            <input type="number" step="0.01" min="0" id="contract-amount" class="form-control" placeholder="ej. 80000" required>
+          </div>
+          <div class="form-group">
+            <label>Periodicidad</label>
+            <select id="contract-frequency" class="form-control">
+              <option value="monthly">Mensual</option>
+              <option value="quarterly">Trimestral</option>
+              <option value="one_time">Pago Único / Campaña Especial</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Fecha de Inicio *</label>
+            <input type="date" id="contract-start-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Fecha de Fin (Opcional)</label>
+            <input type="date" id="contract-end-date" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Condiciones y Observaciones</label>
+          <textarea id="contract-notes" class="form-control" rows="2" placeholder="Detalles de rotación, exclusividad, etc..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+          <button type="button" class="btn btn-outline" onclick="closeContractModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="check"></i> Guardar Acuerdo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: IMPORTACIÓN CONTROLADA DEL CATÁLOGO DE REFERENCIA -->
+  <div id="import-catalog-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 620px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 800;">Catálogo Base de Referencia</h3>
+        <button class="btn btn-outline" style="padding: 6px;" onclick="closeImportCatalogModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <div style="padding: 12px 16px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; margin-bottom: 16px; font-size: 12.5px; color: #cbd5e1;">
+        ℹ️ Estos 9 distribuidores corresponden al catálogo inicial de ejemplo. Se registrarán explícitamente con la etiqueta <strong style="color: #38bdf8;">Catálogo / Referencia</strong> para distinguirlos con claridad de clientes comerciales contratados.
+      </div>
+
+      <div id="import-catalog-items-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
+        <!-- Lista de checkboxes -->
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px;">
+        <label style="font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <input type="checkbox" id="import-catalog-select-all" checked onchange="toggleSelectAllCatalog(this.checked)"> Seleccionar todos
+        </label>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline" onclick="closeImportCatalogModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="executeControlledCatalogImport()"><i data-lucide="upload-cloud"></i> Importar a Supabase</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REVISAR CACHÉ LOCAL DE DISTRIBUIDORES -->
+  <div id="review-local-distributors-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 620px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 800;">Distribuidores en Almacenamiento Local</h3>
+        <button class="btn btn-outline" style="padding: 6px;" onclick="closeReviewLocalModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <div style="font-size: 12.5px; color: #cbd5e1; margin-bottom: 14px;">
+        Los siguientes registros se encuentran en el navegador actual. Puedes seleccionar cuáles deseas subir a la nube como mayoristas contratados o descartar la caché.
+      </div>
+
+      <div id="review-local-items-list" style="max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
+        <!-- Lista de locales -->
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px;">
+        <button class="btn btn-outline" style="color: #ef4444;" onclick="clearLocalStorageDistributors()">Descartar Caché Local</button>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline" onclick="closeReviewLocalModal()">Cerrar</button>
+          <button class="btn btn-primary" onclick="executeControlledLocalImport()"><i data-lucide="upload-cloud"></i> Migrar Seleccionados</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

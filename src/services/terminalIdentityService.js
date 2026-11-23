@@ -81,35 +81,74 @@ export async function getOrEnrollTerminalToken() {
     ? localStorage.getItem(STORAGE_KEYS.ENROLLMENT_TICKET)
     : null;
 
-  // Si no hay ticket de enrolamiento autorizado, no se puede auto-enrolar (mitigación First-Claim Hijacking)
-  if (!enrollmentTicket) {
-    return null;
+  // 1. Intentar enrolamiento mediante ticket administrativo si estuviera presente
+  if (enrollmentTicket) {
+    const syncUrl = getTerminalSyncUrl();
+    try {
+      const res = await fetch(`${syncUrl}/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          installationId,
+          enrollmentTicket
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.terminalToken) {
+          await storeTerminalToken(data.terminalToken);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(STORAGE_KEYS.ENROLLMENT_TICKET);
+          }
+          try {
+            const { replayDeadLetterEvents } = await import('./syncService.js');
+            replayDeadLetterEvents();
+          } catch (e) {}
+          return data.terminalToken;
+        }
+      }
+    } catch (e) {
+      console.warn('[TerminalIdentity] Error durante enrolamiento de terminal con ticket:', e);
+    }
   }
 
-  const syncUrl = getTerminalSyncUrl();
+  // 2. Intentar enrolamiento seguro mediante certificado digital de Licencia Básica legítima
+  const licenseToken = (typeof localStorage !== 'undefined')
+    ? localStorage.getItem('kioscoprox_license_token')
+    : null;
 
-  try {
-    const res = await fetch(`${syncUrl}/enroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        installationId,
-        enrollmentTicket
-      })
-    });
+  if (licenseToken) {
+    const syncUrl = getTerminalSyncUrl();
+    try {
+      const merchantData = getCommerceProfile();
+      const res = await fetch(`${syncUrl}/enroll-license`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          installationId,
+          licenseToken,
+          merchantData
+        })
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.terminalToken) {
-        await storeTerminalToken(data.terminalToken);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(STORAGE_KEYS.ENROLLMENT_TICKET);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.terminalToken) {
+          await storeTerminalToken(data.terminalToken);
+          try {
+            const { replayDeadLetterEvents } = await import('./syncService.js');
+            replayDeadLetterEvents();
+          } catch (e) {}
+          return data.terminalToken;
         }
-        return data.terminalToken;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.warn('[TerminalIdentity] Enrolamiento por licencia rechazado:', res.status, errData);
       }
+    } catch (e) {
+      console.warn('[TerminalIdentity] Error de red durante enrolamiento por licencia:', e);
     }
-  } catch (e) {
-    console.warn('[TerminalIdentity] Error durante enrolamiento de terminal:', e);
   }
 
   return null;
