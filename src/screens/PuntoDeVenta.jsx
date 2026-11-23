@@ -102,20 +102,25 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
   };
   
   const [cart, setCart] = useState([]);
+  
+  useEffect(() => {
+    window.__ACTIVE_SALE__ = cart.length > 0;
+    return () => { window.__ACTIVE_SALE__ = false; };
+  }, [cart]);
   const [search, setSearch] = useState('');
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [category, setCategory] = useState('Todos');
   const [subcategory, setSubcategory] = useState('Todas');
   
   const upcomingReservation = React.useMemo(() => {
-    if (!caja.isOpen || !caja.openedBy || !reservations) return null;
+    if (!caja.isOpen || !(caja.activeUserId || caja.openedBy) || !reservations) return null;
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
     const currentMins = now.getHours() * 60 + now.getMinutes();
     
     // Find reservations for the active user today that are pending
     const userRes = reservations.filter(r => 
-      r.userId === caja.openedBy && 
+      r.userId === (caja.activeUserId || caja.openedBy) && 
       r.date === todayStr && 
       r.status === 'Pendiente'
     );
@@ -139,7 +144,7 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
     });
     
     return closest;
-  }, [reservations, caja.openedBy, caja.isOpen]);
+  }, [reservations, caja.activeUserId, caja.openedBy, caja.isOpen]);
   
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
@@ -197,6 +202,13 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
   const [cajaConfirmMsg, setCajaConfirmMsg] = useState('');
   const [cajaDifference, setCajaDifference] = useState(0);
 
+  const handleCloseLockModal = () => {
+    setIsLocked(false);
+    setSelectedUserForLogin(null);
+    setLoginPin('');
+    setPinError(false);
+  };
+
   const pinInputRef = useRef(null);
 
   useEffect(() => {
@@ -219,8 +231,8 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
     const amount = parseFloat(cajaAmount);
     if(isNaN(amount) || amount <= 0) return;
     
-    const activeUser = caja.isOpen ? users.find(u => u.id === caja.openedBy) : null;
-    let userName = activeUser ? activeUser.name : caja.openedByName;
+    const activeUser = caja.isOpen ? users.find(u => u.id === (caja.activeUserId || caja.openedBy)) : null;
+    let userName = activeUser ? activeUser.name : (caja.activeUserName || caja.openedByName);
     if (!userName || userName === 'Sistema') {
        userName = users.find(u => u.role === 'Admin')?.name || 'Admin';
     }
@@ -236,8 +248,10 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
          openedAt: timeStr, 
          openedDate: dateStr,
          openedTimestamp: now.getTime(),
-         openedBy: selectedUserForLogin?.id,
-         openedByName: selectedUserForLogin?.name
+         openedBy: selectedUserForLogin?.id || null,
+         openedByName: selectedUserForLogin?.name || null,
+         activeUserId: selectedUserForLogin?.id || null,
+         activeUserName: selectedUserForLogin?.name || null
        });
        setIsLocked(false);
        setSelectedUserForLogin(null);
@@ -263,13 +277,16 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
       
       if (selectedUserForLogin.role === 'Admin' && typeof setGlobalAdminAuthed === 'function') {
         setGlobalAdminAuthed(true);
+      } else if (typeof setGlobalAdminAuthed === 'function') {
+        setGlobalAdminAuthed(false);
       }
 
-      // Si la caja ya está abierta, solo desbloqueamos el turno
+      // Si la caja ya está abierta, solo desbloqueamos el turno y actualizamos el operador activo
+      // Manteniendo estrictamente inalterable la identidad del usuario que abrió la caja
       if (caja.isOpen) {
          updateCaja({
-           openedBy: selectedUserForLogin.id,
-           openedByName: selectedUserForLogin.name
+           activeUserId: selectedUserForLogin.id,
+           activeUserName: selectedUserForLogin.name
          });
          setIsLocked(false);
          setLoginPin('');
@@ -318,12 +335,24 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
       const reportedEfectivo = parseFloat(arqueoEfectivo);
       const finalReportedEfectivo = isNaN(reportedEfectivo) ? expectedEfectivo : reportedEfectivo;
 
+      const closingUser = (caja.activeUserId && users.find(u => u.id === caja.activeUserId && u.isActive)) || (selectedUserForLogin && selectedUserForLogin.isActive ? selectedUserForLogin : null);
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      const dateStr = now.toLocaleDateString('es-AR');
+      const closedBy = closingUser ? closingUser.id : (caja.activeUserId ? Number(caja.activeUserId) : null);
+      const closedByName = closingUser ? closingUser.name : (caja.activeUserName || null);
+
       const shiftData = {
          openedAt: caja.openedAt,
          openedDate: caja.openedDate,
          openedTimestamp: caja.openedTimestamp,
-         openedBy: caja.openedBy,
-         openedByName: caja.openedByName,
+         openedBy: caja.openedBy || null,
+         openedByName: caja.openedByName || null,
+         closedAt: timeStr,
+         closedDate: dateStr,
+         closedAtDate: now.toISOString(),
+         closedBy: closedBy,
+         closedByName: closedByName,
          initialEfectivo: caja.initialEfectivo || 0,
          expectedEfectivo: expectedEfectivo,
          reportedEfectivo: finalReportedEfectivo,
@@ -360,7 +389,9 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
       const turnosAusencias = turnosHoy.filter(r => r.status === 'Cancelado').length;
       
       const isBarberia = kiosco.businessConfig?.businessType === 'barberia';
-      const summaryText = `resumen del dia\n💰 ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(totalFacturado)} facturados\n${isBarberia ? '✂️' : '👥'} ${totalClientes} clientes` + 
+      const openingLabel = caja.openedByName || 'No registrado';
+      const closingLabel = closedByName || 'No registrado';
+      const summaryText = `resumen del dia\n👤 Apertura: ${openingLabel}\n🔒 Cierre: ${closingLabel}\n💰 ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(totalFacturado)} facturados\n${isBarberia ? '✂️' : '👥'} ${totalClientes} clientes` + 
       (isBarberia ? `\n📅 ${turnosTotales} turnos\n❌ ${turnosAusencias} ausencias` : '') + 
       `\n🌟 ${nuevos} clientes nuevos\n🔄 ${recurrentes + anonymousSales} clientes recurrentes`;
       
@@ -437,6 +468,11 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
         return;
       }
       if (e.key === 'Escape') {
+        if (isLocked) {
+          e.preventDefault();
+          handleCloseLockModal();
+          return;
+        }
         if (activeModal) {
           e.preventDefault();
           setActiveModal(null);
@@ -528,7 +564,7 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, activeModal, kiosco.businessConfig?.plan, showPaymentOptions, paymentMethod]);
+  }, [cart, activeModal, isLocked, kiosco.businessConfig?.plan, showPaymentOptions, paymentMethod]);
 
   const getDisplayStock = (item) => {
     if (item.isService) {
@@ -766,8 +802,8 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
       method: finalMethod,
       client: client ? client.name : 'Consumidor Final',
       clientId: client ? client.id : null,
-      sellerId: caja.openedBy || null,
-      sellerName: caja.openedByName || 'Admin Default',
+      sellerId: caja.activeUserId || caja.openedBy || null,
+      sellerName: caja.activeUserName || caja.openedByName || null,
       linkedReservationId: checkoutReservation ? checkoutReservation.id : null
     };
 
@@ -925,9 +961,9 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>Mi Caja ({caja.isOpen ? 'Abierta' : 'Cerrada'})</span>
-                {caja.isOpen && caja.openedByName && (
+                {caja.isOpen && (caja.activeUserName || caja.openedByName) && (
                   <span style={{ fontSize: '11px', backgroundColor: 'rgba(66, 133, 244, 0.1)', color: 'var(--color-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                    {caja.openedByName}
+                    {caja.activeUserName || caja.openedByName}
                   </span>
                 )}
               </div>
@@ -1600,12 +1636,12 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
           <div style={{ backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '12px', marginBottom: '20px', border: '1px solid var(--color-border)' }}>
              <h4 style={{ margin: '0 0 12px 0', fontSize: '15px' }}>Resumen del Turno</h4>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                <span style={{ color: 'var(--color-text-muted)' }}>Cajero:</span>
-                <span style={{ fontWeight: 600 }}>{caja.openedByName || 'Admin'}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>Apertura:</span>
+                <span style={{ fontWeight: 600 }}>{caja.openedByName || 'No registrado'} ({caja.openedDate} {caja.openedAt})</span>
              </div>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                <span style={{ color: 'var(--color-text-muted)' }}>Inicio:</span>
-                <span style={{ fontWeight: 600 }}>{caja.openedDate} a las {caja.openedAt}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>Cierre por:</span>
+                <span style={{ fontWeight: 600 }}>{caja.activeUserName || caja.openedByName || 'No registrado'}</span>
              </div>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
                 <span style={{ color: 'var(--color-text-muted)' }}>Ventas Digitales:</span>
@@ -1733,16 +1769,14 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
           
           <div style={{ position: 'relative', width: '550px', maxWidth: '95vw', backgroundColor: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             
-            {caja.isOpen && (
-               <button 
-                 className="btn-icon"
-                 onClick={() => { setIsLocked(false); setSelectedUserForLogin(null); setLoginPin(''); setPinError(false); }}
-                 style={{ position: 'absolute', top: '24px', right: '24px', backgroundColor: '#f1f3f5', borderRadius: '50%', padding: '8px' }}
-                 title="Cancelar y volver a la caja"
-               >
-                 <X size={20} />
-               </button>
-            )}
+            <button 
+              className="btn-icon"
+              onClick={handleCloseLockModal}
+              style={{ position: 'absolute', top: '24px', right: '24px', backgroundColor: '#f1f3f5', borderRadius: '50%', padding: '8px' }}
+              title={caja.isOpen ? "Cancelar y volver a la caja" : "Cerrar y volver al punto de venta"}
+            >
+              <X size={20} />
+            </button>
 
             {!selectedUserForLogin ? (
                // Pantalla 1: Selección de Usuario
@@ -1802,6 +1836,12 @@ const PuntoDeVenta = ({ kiosco, ofertas, setGlobalAdminAuthed }) => {
                         if (val.length <= 4) setLoginPin(val);
                       }}
                       onKeyDown={e => {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleCloseLockModal();
+                          return;
+                        }
                         if (e.key === 'Enter' && loginPin.length === 4) handleLoginSubmit();
                       }}
                       style={{ width: '200px', fontSize: '32px', letterSpacing: '12px', textAlign: 'center', padding: '12px', borderRadius: '12px', border: pinError ? '2px solid var(--color-danger)' : '2px solid var(--color-border)', backgroundColor: '#f8f9fa', color: pinError ? 'var(--color-danger)' : '#1a1f36' }}

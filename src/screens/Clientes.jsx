@@ -1,6 +1,7 @@
 // src/screens/Clientes.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, UserPlus, Upload, Download, DollarSign, Users, X, Edit2, Trash2, Filter, MessageCircle, Receipt } from 'lucide-react';
+import * as xlsx from 'xlsx';
 
 const formatCur = (num) => `$ ${num.toLocaleString('es-AR')}`;
 
@@ -25,11 +26,11 @@ const Modal = ({ title, onClose, children }) => (
 );
 
 const Clientes = ({ kiosco }) => {
-  const { clients, addClient, updateClient, deleteClient, payDebt, caja, businessConfig, users, sales = [] } = kiosco;
+  const { clients, addClient, batchImportClients, updateClient, deleteClient, payDebt, caja, businessConfig, users, sales = [] } = kiosco;
   const isPro = businessConfig?.plan === 'Pro';
   
-  const activeUser = caja.isOpen ? users.find(u => u.id === caja.openedBy) : null;
-  let userName = activeUser ? activeUser.name : caja.openedByName;
+  const activeUser = caja.isOpen ? users.find(u => u.id === (caja.activeUserId || caja.openedBy)) : null;
+  let userName = activeUser ? activeUser.name : (caja.activeUserName || caja.openedByName);
   if (!userName || userName === 'Sistema') {
      userName = users.find(u => u.role === 'Admin')?.name || 'Admin';
   }
@@ -42,6 +43,11 @@ const Clientes = ({ kiosco }) => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
+
+  // Import / Export state
+  const fileInputRef = useRef(null);
+  const [importPreview, setImportPreview] = useState(null);
+  const [feedbackModal, setFeedbackModal] = useState(null);
 
   // New client state
   const [newClientName, setNewClientName] = useState('');
@@ -64,6 +70,175 @@ const Clientes = ({ kiosco }) => {
 
   // Debt detail state
   const [selectedClientForDetail, setSelectedClientForDetail] = useState(null);
+
+  // Exportar Clientes a Excel (.xlsx)
+  const handleExportExcel = () => {
+    try {
+      const commercialClients = (clients || []).filter(c => c.id !== 1);
+      if (commercialClients.length === 0) {
+        setFeedbackModal({
+          type: 'info',
+          title: 'Exportar Clientes',
+          message: 'No hay clientes registrados para exportar (aparte del Consumidor Final predeterminado).'
+        });
+        return;
+      }
+
+      const exportData = commercialClients.map(c => ({
+        'Nombre': c.name || '',
+        'CUIT/DNI': c.cuit && c.cuit !== 'Consumidor Final' ? c.cuit : '',
+        'Teléfono': c.phone || '',
+        'Saldo Deudor': c.deuda || 0,
+        'Fecha Registro': formatDate(c.createdAt)
+      }));
+
+      const worksheet = xlsx.utils.json_to_sheet(exportData);
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, worksheet, 'Clientes');
+      xlsx.writeFile(workbook, 'Clientes_Simple_ProX.xlsx');
+
+      setFeedbackModal({
+        type: 'success',
+        title: 'Exportación Exitosa',
+        message: `Se exportaron ${commercialClients.length} clientes correctamente a "Clientes_Simple_ProX.xlsx".`
+      });
+    } catch (err) {
+      console.error('Error al exportar clientes:', err);
+      setFeedbackModal({
+        type: 'error',
+        title: 'Error de Exportación',
+        message: 'Ocurrió un error al intentar generar el archivo Excel.'
+      });
+    }
+  };
+
+  // Cargar archivo para Importar Clientes (.xlsx, .xls, .csv)
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const workbook = xlsx.read(bstr, { type: 'binary' });
+        const wsname = workbook.SheetNames[0];
+        if (!wsname) throw new Error('El archivo no contiene hojas');
+        const ws = workbook.Sheets[wsname];
+        const data = xlsx.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!data || data.length === 0) {
+          setFeedbackModal({
+            type: 'error',
+            title: 'Archivo Vacío',
+            message: 'El archivo Excel no contiene filas con datos para importar.'
+          });
+          return;
+        }
+
+        const headers = Array.from(new Set(data.flatMap(row => Object.keys(row))));
+        const autoMap = (possibleNames) => {
+          return headers.find(h => possibleNames.some(p => h.toLowerCase().trim().includes(p.toLowerCase()))) || '';
+        };
+
+        const colName = autoMap(['nombre', 'cliente', 'razon social', 'razón social', 'contacto', 'name']);
+        const colCuit = autoMap(['cuit', 'dni', 'documento', 'identificacion', 'identificación']);
+        const colPhone = autoMap(['telefono', 'teléfono', 'celular', 'movil', 'móvil', 'phone', 'whatsapp', 'tel']);
+
+        if (!colName) {
+          setFeedbackModal({
+            type: 'error',
+            title: 'Columna Requerida No Encontrada',
+            message: 'No se detectó una columna de "Nombre" en el archivo. Las columnas admitidas son: Nombre, Cliente, Razón Social o Contacto.'
+          });
+          return;
+        }
+
+        // Sets de clientes existentes para chequeo estricto de duplicados
+        const existingNames = new Set(
+          (clients || []).map(c => (c.name || '').trim().toLowerCase()).filter(Boolean)
+        );
+        const existingCuits = new Set(
+          (clients || [])
+            .map(c => (c.cuit || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''))
+            .filter(c => c && c !== 'consumidorfinal' && c !== '0')
+        );
+
+        const validClients = [];
+        let duplicateCount = 0;
+        let invalidCount = 0;
+
+        data.forEach(row => {
+          const rawName = row[colName] != null ? String(row[colName]).trim() : '';
+          if (!rawName) {
+            invalidCount++;
+            return;
+          }
+
+          const normName = rawName.toLowerCase();
+          const rawCuit = colCuit && row[colCuit] != null ? String(row[colCuit]).trim() : '';
+          const normCuit = rawCuit.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isCuitValid = normCuit && normCuit !== 'consumidorfinal' && normCuit !== '0';
+          const rawPhone = colPhone && row[colPhone] != null ? String(row[colPhone]).trim() : '';
+
+          const isDuplicate = existingNames.has(normName) || (isCuitValid && existingCuits.has(normCuit));
+
+          if (isDuplicate) {
+            duplicateCount++;
+          } else {
+            validClients.push({
+              name: rawName,
+              cuit: rawCuit || 'Consumidor Final',
+              phone: rawPhone
+            });
+            existingNames.add(normName);
+            if (isCuitValid) existingCuits.add(normCuit);
+          }
+        });
+
+        setImportPreview({
+          fileName: file.name,
+          totalRows: data.length,
+          validClients,
+          duplicateCount,
+          invalidCount,
+          detectedCols: {
+            nombre: colName,
+            cuit: colCuit || '(No detectada)',
+            telefono: colPhone || '(No detectada)'
+          }
+        });
+      } catch (error) {
+        console.error('Error al leer Excel de clientes:', error);
+        setFeedbackModal({
+          type: 'error',
+          title: 'Error de Lectura',
+          message: 'No se pudo leer el archivo. Asegúrate de que sea un archivo Excel (.xlsx, .xls) o CSV válido.'
+        });
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Confirmar Importación de Clientes
+  const handleConfirmImport = () => {
+    if (!importPreview || importPreview.validClients.length === 0) {
+      setImportPreview(null);
+      return;
+    }
+
+    const { validClients, duplicateCount, invalidCount } = importPreview;
+    const countAdded = batchImportClients ? batchImportClients(validClients) : validClients.length;
+
+    setImportPreview(null);
+    setFeedbackModal({
+      type: 'success',
+      title: 'Importación Completada',
+      message: `Se importaron con éxito ${countAdded} clientes nuevos (${duplicateCount} duplicados omitidos, ${invalidCount} filas sin nombre omitidas).`
+    });
+  };
 
   const handleRegisterClient = () => {
     if (!newClientName) return;
@@ -90,15 +265,53 @@ const Clientes = ({ kiosco }) => {
   };
 
   const openDelete = (client) => {
+    if (!client) return;
+
+    if (client.id === 1) {
+      setFeedbackModal({
+        type: 'error',
+        title: 'Acción No Permitida',
+        message: 'No es posible eliminar el cliente de sistema "Consumidor Final".'
+      });
+      return;
+    }
+
+    if ((client.deuda || 0) > 0) {
+      setFeedbackModal({
+        type: 'error',
+        title: 'Cliente con Deuda Pendiente',
+        message: `No es posible eliminar a "${client.name}" porque tiene una deuda activa de $${(client.deuda || 0).toLocaleString('es-AR')}. Primero debe registrar el cobro y regularizar su cuenta corriente.`
+      });
+      return;
+    }
+
+    const clientSalesCount = (sales || []).filter(s => s.clientId === client.id || (s.client && client.name && s.client.trim().toLowerCase() === client.name.trim().toLowerCase())).length;
+    if (clientSalesCount > 0) {
+      setFeedbackModal({
+        type: 'error',
+        title: 'Cliente con Historial de Ventas',
+        message: `No es posible eliminar a "${client.name}" porque posee ${clientSalesCount} venta(s) histórica(s) asociada(s). Para proteger la integridad financiera y los comprobantes contables, este cliente no puede eliminarse.`
+      });
+      return;
+    }
+
     setClientToDelete(client);
     setActiveModal('deleteClient');
   };
 
   const handleDeleteClient = () => {
     if (!clientToDelete) return;
-    deleteClient(clientToDelete.id);
+    const res = deleteClient(clientToDelete.id);
     setActiveModal(null);
     setClientToDelete(null);
+
+    if (res && !res.success) {
+      setFeedbackModal({
+        type: 'error',
+        title: 'Eliminación Rechazada',
+        message: res.message
+      });
+    }
   };
 
   const handleRegisterPayment = () => {
@@ -143,12 +356,27 @@ const Clientes = ({ kiosco }) => {
           <p className="page-subtitle">Gestiona tus clientes y sus cuentas corrientes</p>
         </div>
         <div className="page-actions">
-              <button className="btn btn-outline" style={{ display: 'flex', gap: '8px' }}>
-                <Upload size={16} /> Importar
-              </button>
-              <button className="btn btn-outline" style={{ display: 'flex', gap: '8px' }}>
-                <Download size={16} /> Exportar
-              </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".xlsx, .xls, .csv"
+            onChange={handleFileUpload}
+          />
+          <button
+            className="btn btn-outline"
+            style={{ display: 'flex', gap: '8px' }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload size={16} /> Importar
+          </button>
+          <button
+            className="btn btn-outline"
+            style={{ display: 'flex', gap: '8px' }}
+            onClick={handleExportExcel}
+          >
+            <Download size={16} /> Exportar
+          </button>
           <button className="btn btn-primary" onClick={() => setActiveModal('newClient')}>
             <UserPlus size={16} /> Nuevo Cliente
           </button>
@@ -287,28 +515,33 @@ const Clientes = ({ kiosco }) => {
                           <Edit2 size={15} />
                         </button>
 
-                        {/* Eliminar — disponible en todos los planes */}
-                        <button
-                          className="btn-icon text-danger"
-                          title="Eliminar cliente"
-                          onClick={() => openDelete(c)}
-                          style={{ padding: '6px', backgroundColor: 'rgba(234, 67, 53, 0.1)', borderRadius: '6px' }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-
-                        {/* Saldar — solo plan Pro (fiado es feature Pro) */}
-                        {isPro && (
+                        {/* Eliminar — disponible en todos los planes salvo Consumidor Final */}
+                        {c.id !== 1 && (
                           <button
-                            className="btn btn-outline"
-                            style={{ padding: '5px 10px', fontSize: '13px', opacity: c.deuda > 0 ? 1 : 0.4 }}
-                            disabled={!c.deuda || c.deuda <= 0}
-                            title="Registrar pago de deuda"
-                            onClick={() => { setSelectedClientForPayment(c); setActiveModal('payDebt'); }}
+                            className="btn-icon text-danger"
+                            title={c.deuda > 0 ? "Cliente con saldo deudor pendiente" : "Eliminar cliente"}
+                            onClick={() => openDelete(c)}
+                            style={{ 
+                              padding: '6px', 
+                              backgroundColor: c.deuda > 0 ? 'rgba(234, 67, 53, 0.05)' : 'rgba(234, 67, 53, 0.1)', 
+                              borderRadius: '6px',
+                              opacity: c.deuda > 0 ? 0.7 : 1
+                            }}
                           >
-                            <DollarSign size={14} /> Saldar
+                            <Trash2 size={15} />
                           </button>
                         )}
+
+                        {/* Saldar — disponible en ambos planes si el cliente registra deuda */}
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '5px 10px', fontSize: '13px', opacity: c.deuda > 0 ? 1 : 0.4 }}
+                          disabled={!c.deuda || c.deuda <= 0}
+                          title={c.deuda > 0 ? "Registrar cobro de deuda" : "Sin deuda pendiente"}
+                          onClick={() => { setSelectedClientForPayment(c); setActiveModal('payDebt'); }}
+                        >
+                          <DollarSign size={14} /> Saldar
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -434,7 +667,7 @@ const Clientes = ({ kiosco }) => {
               </div>
               <h3 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px 0', color: '#1a1f36' }}>¿Eliminar cliente?</h3>
               <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: '1.5', margin: 0 }}>
-                Estás a punto de eliminar a <strong>{clientToDelete.name}</strong>. Esta acción no se puede deshacer.
+                Estás a punto de eliminar a <strong>{clientToDelete.name}</strong>. Este cliente no registra deuda pendiente ni ventas asociadas. Esta acción no se puede deshacer.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -673,7 +906,7 @@ const Clientes = ({ kiosco }) => {
             >
               Cerrar
             </button>
-            {isPro && (
+            {selectedClientForDetail?.deuda > 0 && (
               <button 
                 className="btn btn-primary"
                 onClick={() => {
@@ -686,6 +919,109 @@ const Clientes = ({ kiosco }) => {
                 <DollarSign size={15} /> Registrar Cobro / Saldar
               </button>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal de Vista Previa de Importación de Clientes */}
+      {importPreview && (
+        <Modal title="Vista Previa de Importación de Clientes" onClose={() => setImportPreview(null)}>
+          <div style={{ padding: '4px' }}>
+            <p style={{ margin: '0 0 16px 0', color: 'var(--color-text-muted)', fontSize: '14px' }}>
+              Archivo: <strong>{importPreview.fileName}</strong> ({importPreview.totalRows} filas detectadas)
+            </p>
+
+            <div style={{ backgroundColor: '#f8f9fa', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#495057', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Columnas Mapeadas
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '13px' }}>
+                <div><strong>Nombre:</strong> {importPreview.detectedCols.nombre}</div>
+                <div><strong>CUIT/DNI:</strong> {importPreview.detectedCols.cuit}</div>
+                <div><strong>Teléfono:</strong> {importPreview.detectedCols.telefono}</div>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8f9fa', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 600, color: '#1a1f36', fontSize: '14px' }}>Clientes Nuevos a Importar:</span>
+                <span style={{ fontWeight: 700, color: '#34a853', fontSize: '15px' }}>{importPreview.validClients.length}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 600, color: '#1a1f36', fontSize: '14px' }}>Clientes Duplicados (se omitirán):</span>
+                <span style={{ fontWeight: 700, color: '#fabb05', fontSize: '15px' }}>{importPreview.duplicateCount}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600, color: '#1a1f36', fontSize: '14px' }}>Filas Inválidas (sin nombre, se omitirán):</span>
+                <span style={{ fontWeight: 700, color: '#ea4335', fontSize: '15px' }}>{importPreview.invalidCount}</span>
+              </div>
+            </div>
+
+            {importPreview.validClients.length > 0 ? (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#495057', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Vista previa de clientes a agregar:
+                </div>
+                <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f3f5', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 10px' }}>Nombre</th>
+                        <th style={{ padding: '6px 10px' }}>CUIT / DNI</th>
+                        <th style={{ padding: '6px 10px' }}>Teléfono</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.validClients.slice(0, 5).map((vc, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '6px 10px', fontWeight: 600 }}>{vc.name}</td>
+                          <td style={{ padding: '6px 10px', color: 'var(--color-text-muted)' }}>{vc.cuit}</td>
+                          <td style={{ padding: '6px 10px', color: 'var(--color-text-muted)' }}>{vc.phone || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {importPreview.validClients.length > 5 && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', textAlign: 'right' }}>
+                    Mostrando 5 de {importPreview.validClients.length} clientes nuevos
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '12px', backgroundColor: '#fff3cd', color: '#856404', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
+                No se encontraron clientes nuevos válidos para incorporar.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setImportPreview(null)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={importPreview.validClients.length === 0}
+                onClick={handleConfirmImport}
+              >
+                Confirmar Importación ({importPreview.validClients.length})
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal de Notificación / Alerta */}
+      {feedbackModal && (
+        <Modal title={feedbackModal.title} onClose={() => setFeedbackModal(null)}>
+          <div style={{ padding: '8px 0', textAlign: 'center' }}>
+            <p style={{ fontSize: '15px', color: 'var(--color-text)', lineHeight: '1.5', margin: '0 0 20px 0' }}>
+              {feedbackModal.message}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="btn btn-primary" style={{ padding: '8px 28px' }} onClick={() => setFeedbackModal(null)}>
+                Entendido
+              </button>
+            </div>
           </div>
         </Modal>
       )}

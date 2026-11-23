@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Package, ArrowLeft, Plus, X, Box, DollarSign, Wallet, Eye, Edit2, Save, Trash2, Settings, CheckCircle2 } from 'lucide-react';
+import { Search, Package, ArrowLeft, Plus, X, Box, DollarSign, Wallet, Eye, Edit2, Save, Trash2, Settings, CheckCircle2, Lock, UserCheck } from 'lucide-react';
 
 const Modal = ({ title, onClose, minWidth, children }) => (
   <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26, 31, 54, 0.6)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -69,7 +69,7 @@ const ProductSearchDropdown = ({ onSelect, products }) => {
 const Compras = ({ kiosco }) => {
   const { products, purchases, addPurchase, updatePurchase, caja, users, suppliers, setSuppliers, updateProduct } = kiosco;
   
-  const activeUser = caja.isOpen ? users.find(u => u.id === caja.openedBy) : null;
+  const activeUser = caja.isOpen ? users.find(u => u.id === (caja.activeUserId || caja.openedBy)) : null;
   const activeRole = activeUser ? activeUser.role : 'Admin'; 
   
   const [view, setView] = useState('list'); 
@@ -79,6 +79,15 @@ const Compras = ({ kiosco }) => {
   const [supplierTerm, setSupplierTerm] = useState('');
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+  const [remitoNumber, setRemitoNumber] = useState('');
+  const [searchPurchasesTerm, setSearchPurchasesTerm] = useState('');
+
+  // Estados para validación de responsable con PIN cuando no hay usuario activo
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [selectedAuthUserId, setSelectedAuthUserId] = useState('');
+  const [authPin, setAuthPin] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [cajaBlockedError, setCajaBlockedError] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
   const [filterEdited, setFilterEdited] = useState('Todos');
@@ -207,7 +216,29 @@ const Compras = ({ kiosco }) => {
   const cartTotal = cart.reduce((acc, item) => acc + ((parseInt(item.qty) || 0) * (parseFloat(item.cost) || 0)), 0);
   const totalItems = cart.reduce((acc, item) => acc + (parseInt(item.qty) || 0), 0);
 
-  const handleConfirmPurchase = () => {
+  const isCashOperationBlocked = () => {
+    if (caja.isOpen) return false;
+
+    if (editingPurchaseId) {
+      const oldPurchase = purchases.find(p => p.id === editingPurchaseId);
+      if (!oldPurchase) return false;
+      const oldCash = oldPurchase.method === 'Efectivo' ? Number(oldPurchase.total) || 0 : 0;
+      const newCash = paymentMethod === 'Efectivo' ? Number(cartTotal) || 0 : 0;
+      return (newCash - oldCash) !== 0;
+    }
+
+    // Nueva compra en efectivo
+    return paymentMethod === 'Efectivo';
+  };
+
+  const executeConfirmPurchase = (responsibleUser) => {
+    if (isCashOperationBlocked()) {
+      setShowAuthModal(false);
+      setShowCheckoutModal(false);
+      setCajaBlockedError('Para registrar esta operación en efectivo primero debés abrir la caja. La compra no fue guardada.');
+      return;
+    }
+
     const sanitizedCart = cart.map(item => ({
       ...item,
       qty: Number(item.qty) || 1,
@@ -216,24 +247,86 @@ const Compras = ({ kiosco }) => {
       margin: Number(item.margin) || 0
     }));
 
+    const sanitizedRemito = (remitoNumber || '').trim();
+
     const purchaseData = {
       items: sanitizedCart,
       total: cartTotal,
       method: paymentMethod,
       supplierTerm: supplierTerm || 'Varios/General',
+      remitoNumber: sanitizedRemito || null,
     };
     
+    let result;
     if (editingPurchaseId) {
-      const modifierName = activeUser ? activeUser.name : 'Administrador';
-      updatePurchase(editingPurchaseId, purchaseData, modifierName);
+      const modifierInfo = {
+        id: responsibleUser ? responsibleUser.id : null,
+        name: responsibleUser ? responsibleUser.name : 'Usuario no registrado'
+      };
+      result = updatePurchase(editingPurchaseId, purchaseData, modifierInfo);
     } else {
-      addPurchase(purchaseData);
+      purchaseData.creatorId = responsibleUser ? responsibleUser.id : null;
+      purchaseData.creatorName = responsibleUser ? responsibleUser.name : 'Usuario no registrado';
+      result = addPurchase(purchaseData);
+    }
+
+    // Si el hook rechazó la operación (ej: caja cerrada), NO limpiar el formulario ni el carrito
+    if (result && result.success === false) {
+      setShowAuthModal(false);
+      setShowCheckoutModal(false);
+      setCajaBlockedError(result.message || 'Para registrar esta operación en efectivo primero debés abrir la caja. La compra no fue guardada.');
+      return;
     }
     
     setCart([]);
+    setRemitoNumber('');
     setShowCheckoutModal(false);
+    setShowAuthModal(false);
     setView('list');
     setEditingPurchaseId(null);
+  };
+
+  const handleProceedToConfirm = () => {
+    if (isCashOperationBlocked()) {
+      setShowCheckoutModal(false);
+      setCajaBlockedError('Para registrar esta operación en efectivo primero debés abrir la caja. La compra no fue guardada.');
+      return;
+    }
+
+    if (activeUser && activeUser.isActive !== false) {
+      executeConfirmPurchase(activeUser);
+    } else {
+      const activeUsersList = users.filter(u => u.isActive !== false);
+      setSelectedAuthUserId(activeUsersList.length > 0 ? String(activeUsersList[0].id) : '');
+      setAuthPin('');
+      setAuthError('');
+      setShowAuthModal(true);
+    }
+  };
+
+  const handleAuthSubmit = () => {
+    if (isCashOperationBlocked()) {
+      setShowAuthModal(false);
+      setShowCheckoutModal(false);
+      setCajaBlockedError('Para registrar esta operación en efectivo primero debés abrir la caja. La compra no fue guardada.');
+      return;
+    }
+
+    if (!selectedAuthUserId) {
+      setAuthError('Por favor seleccione un usuario responsable.');
+      return;
+    }
+    const targetUser = users.find(u => String(u.id) === String(selectedAuthUserId));
+    if (!targetUser) {
+      setAuthError('Usuario no encontrado.');
+      return;
+    }
+    if (String(targetUser.pin) !== String(authPin)) {
+      setAuthError('PIN incorrecto. Ingrese los 4 dígitos correspondientes.');
+      return;
+    }
+    setAuthError('');
+    executeConfirmPurchase(targetUser);
   };
 
   const formatShortDate = (isoString) => {
@@ -242,9 +335,10 @@ const Compras = ({ kiosco }) => {
 
   const startEdit = (purch) => {
     setEditingPurchaseId(purch.id);
-    setCart(purch.items.map(i => ({...i, cost: i.unitCost || i.cost})));
+    setCart(purch.items.map(i => ({...i, cost: i.unitCost ?? i.cost})));
     setPaymentMethod(purch.method);
     setSupplierTerm(purch.supplierTerm);
+    setRemitoNumber(purch.remitoNumber || '');
     setView('new');
   };
 
@@ -268,11 +362,17 @@ const Compras = ({ kiosco }) => {
             <div style={{ fontSize: '36px', fontWeight: 700, color: '#1a1f36', marginTop: '4px' }}>$ {cartTotal.toLocaleString('es-AR')}</div>
           </div>
 
+          {isCashOperationBlocked() && (
+            <div style={{ backgroundColor: 'rgba(234, 67, 53, 0.08)', color: '#ea4335', padding: '12px 16px', borderRadius: '10px', fontSize: '13px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(234, 67, 53, 0.2)', lineHeight: '1.4' }}>
+              <span>⚠️ La caja se encuentra cerrada. Para registrar o modificar operaciones que afecten efectivo debés abrir la caja primero.</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '12px' }}>
             <button className="btn btn-outline" style={{ flex: 1, padding: '14px', borderRadius: '12px', fontWeight: 600 }} onClick={() => setShowCheckoutModal(false)}>
               Revisar Carrito
             </button>
-            <button className="btn btn-primary" style={{ flex: 1, padding: '14px', borderRadius: '12px', fontWeight: 600, backgroundColor: '#34a853', border: 'none' }} onClick={handleConfirmPurchase}>
+            <button className="btn btn-primary" style={{ flex: 1, padding: '14px', borderRadius: '12px', fontWeight: 600, backgroundColor: '#34a853', border: 'none' }} onClick={handleProceedToConfirm}>
               Aceptar e Ingresar
             </button>
           </div>
@@ -283,23 +383,45 @@ const Compras = ({ kiosco }) => {
 
   const renderPurchaseDetailsModal = () => {
     if (!selectedPurchase) return null;
+    const hasRemito = Boolean(selectedPurchase.remitoNumber);
+    const creatorDisplay = selectedPurchase.creatorName || 'Histórico / Responsable no registrado';
+
     return (
       <div className="modal-overlay" onClick={() => setSelectedPurchase(null)} style={{ zIndex: 1100 }}>
-        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '500px', backgroundColor: '#fff', borderRadius: '16px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '580px', backgroundColor: '#fff', borderRadius: '16px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#1a1f36' }}>Detalle de Remito #{selectedPurchase.id.toString().slice(-6)}</h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>{formatShortDate(selectedPurchase.date)} • {selectedPurchase.supplierTerm}</p>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#1a1f36' }}>
+                {hasRemito ? `Remito ${selectedPurchase.remitoNumber}` : `Detalle de Remito #${selectedPurchase.id.toString().slice(-6)}`}
+              </h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                {hasRemito && <span>ID: #{selectedPurchase.id.toString().slice(-6)} • </span>}
+                {formatShortDate(selectedPurchase.date)} • {selectedPurchase.supplierTerm}
+              </p>
             </div>
-            <button onClick={() => setSelectedPurchase(null)} className="btn-icon" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+            <button onClick={() => setSelectedPurchase(null)} className="btn-icon" style={{ background: 'none', border: 'none', cursor: 'padding', padding: '4px' }}>
               <X size={20} color="var(--color-text-muted)" />
             </button>
           </div>
+
+          <div style={{ padding: '12px 24px', backgroundColor: '#f8f9fa', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)' }}>Responsable: </span>
+              <strong style={{ color: '#1a1f36' }}>{creatorDisplay}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)' }}>Pago: </span>
+              <span className="badge" style={{ backgroundColor: 'rgba(66, 133, 244, 0.1)', color: '#4285f4' }}>{selectedPurchase.method}</span>
+            </div>
+          </div>
           
           <div style={{ padding: '24px', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {selectedPurchase.items.map(item => (
-                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 2fr) 1fr 1fr', gap: '12px', padding: '12px', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+              Artículos ingresados ({selectedPurchase.items?.length || 0})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {selectedPurchase.items.map((item, idx) => (
+                <div key={item.id || idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 2fr) 1fr 1fr', gap: '12px', padding: '12px', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#1a1f36' }}>{item.name}</div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>Cto. un: $ {(item.cost ?? item.unitCost ?? 0).toLocaleString('es-AR')}</div>
@@ -309,6 +431,43 @@ const Compras = ({ kiosco }) => {
                 </div>
               ))}
             </div>
+
+            {selectedPurchase.edits && selectedPurchase.edits.length > 0 && (
+              <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1a1f36', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Edit2 size={16} color="var(--color-primary)" />
+                  HISTORIAL DE LA COMPRA ({selectedPurchase.edits.length} edición{selectedPurchase.edits.length > 1 ? 'es' : ''})
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {selectedPurchase.edits.map((edit, idx) => (
+                    <div key={edit.id || idx} style={{ backgroundColor: '#fff', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f36' }}>
+                          {formatShortDate(edit.editDate)} • Modificó: <strong>{edit.modifierName || 'Usuario no registrado'}</strong>
+                        </span>
+                        {edit.oldTotal !== undefined && edit.newTotal !== undefined && edit.oldTotal !== edit.newTotal && (
+                          <span style={{ fontSize: '12px' }}>
+                            <span style={{ textDecoration: 'line-through', color: 'var(--color-text-muted)' }}>${edit.oldTotal.toLocaleString('es-AR')}</span>
+                            {' → '}
+                            <strong style={{ color: 'var(--color-primary)' }}>${edit.newTotal.toLocaleString('es-AR')}</strong>
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#1a1f36', marginBottom: (edit.details && edit.details.length > 0) ? '6px' : '0' }}>
+                        {edit.changesSummary || 'Modificación general'}
+                      </div>
+                      {edit.details && edit.details.length > 0 && (
+                        <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: '1.5' }}>
+                          {edit.details.map((d, dIdx) => (
+                            <li key={dIdx}>{typeof d === 'string' ? d : d.detail}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ padding: '20px 24px', borderTop: '1px solid var(--color-border)', backgroundColor: '#f8f9fa', borderRadius: '0 0 16px 16px' }}>
@@ -316,6 +475,90 @@ const Compras = ({ kiosco }) => {
               <span style={{ fontWeight: 600, fontSize: '16px', color: '#1a1f36' }}>Costo Total Efectuado</span>
               <span style={{ fontWeight: 800, fontSize: '24px', color: 'var(--color-primary)' }}>$ {selectedPurchase.total.toLocaleString('es-AR')}</span>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAuthModal = () => {
+    if (!showAuthModal) return null;
+    const activeUsersList = users.filter(u => u.isActive !== false);
+
+    return (
+      <div className="modal-overlay" onClick={() => setShowAuthModal(false)} style={{ zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26, 31, 54, 0.6)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '420px', backgroundColor: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'scaleIn 0.2s ease-out' }}>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(66, 133, 244, 0.1)', marginBottom: '12px' }}>
+              <Lock size={28} color="var(--color-primary)" />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0', color: '#1a1f36' }}>Identificación de Responsable</h3>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', lineHeight: '1.4', margin: 0 }}>
+              La caja se encuentra cerrada o no hay un usuario activo en el turno. Seleccione su usuario e ingrese su PIN de 4 dígitos para registrar la compra.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: '#1a1f36' }}>
+                Usuario Responsable
+              </label>
+              <select 
+                className="input" 
+                value={selectedAuthUserId} 
+                onChange={e => { setSelectedAuthUserId(e.target.value); setAuthError(''); }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: '#fff' }}
+              >
+                <option value="">-- Seleccionar Usuario --</option>
+                {activeUsersList.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role || 'Operador'})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: '#1a1f36' }}>
+                PIN de Seguridad (4 dígitos)
+              </label>
+              <input 
+                type="password" 
+                maxLength={4}
+                autoFocus
+                className="input" 
+                placeholder="****"
+                value={authPin} 
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setAuthPin(val);
+                  setAuthError('');
+                }}
+                onKeyDown={e => { if (e.key === 'Enter') handleAuthSubmit(); }}
+                style={{ width: '100%', padding: '10px 12px', textAlign: 'center', fontSize: '20px', letterSpacing: '8px', borderRadius: '8px', border: authError ? '1px solid var(--color-danger)' : '1px solid var(--color-border)' }}
+              />
+            </div>
+
+            {authError && (
+              <div style={{ color: '#ea4335', fontSize: '13px', textAlign: 'center', fontWeight: 600, backgroundColor: 'rgba(234, 67, 53, 0.08)', padding: '8px', borderRadius: '6px' }}>
+                {authError}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button 
+              className="btn btn-outline" 
+              style={{ flex: 1, padding: '12px', borderRadius: '8px', fontWeight: 600 }}
+              onClick={() => setShowAuthModal(false)}
+            >
+              Cancelar
+            </button>
+            <button 
+              className="btn btn-primary" 
+              style={{ flex: 1, padding: '12px', borderRadius: '8px', fontWeight: 600 }}
+              onClick={handleAuthSubmit}
+            >
+              Autorizar
+            </button>
           </div>
         </div>
       </div>
@@ -441,7 +684,18 @@ const Compras = ({ kiosco }) => {
       </div>
 
       {(() => {
-        const filteredPurchases = purchases.filter(p => filterEdited === 'Todos' || p.isEdited).slice().reverse();
+        const filteredPurchases = purchases.filter(p => {
+          if (filterEdited === 'Editados' && !p.isEdited) return false;
+          if (searchPurchasesTerm.trim() !== '') {
+            const term = searchPurchasesTerm.trim().toLowerCase();
+            const matchRemito = p.remitoNumber ? String(p.remitoNumber).toLowerCase().includes(term) : false;
+            const matchId = p.id ? (String(p.id).toLowerCase().includes(term) || `#${String(p.id).slice(-6)}`.toLowerCase().includes(term)) : false;
+            const matchSupplier = p.supplierTerm ? String(p.supplierTerm).toLowerCase().includes(term) : false;
+            const matchCreator = p.creatorName ? String(p.creatorName).toLowerCase().includes(term) : false;
+            return matchRemito || matchId || matchSupplier || matchCreator;
+          }
+          return true;
+        }).slice().reverse();
         const totalPages = Math.max(1, Math.ceil(filteredPurchases.length / ITEMS_PER_PAGE));
         const currentPageSafe = Math.min(currentPage, totalPages > 0 ? totalPages : 1);
         const startIdx = (currentPageSafe - 1) * ITEMS_PER_PAGE;
@@ -449,13 +703,33 @@ const Compras = ({ kiosco }) => {
 
         return (
           <div className="card table-card" style={{ marginBottom: '32px' }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <h2 className="card-title">Historial de compras ingresadas</h2>
                 <p className="card-subtitle">Consulta los remitos de stock añadidos previamente.</p>
               </div>
-              <div>
-                <select className="input" value={filterEdited} onChange={e => { setFilterEdited(e.target.value); setCurrentPage(1); }} style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: '#fff' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', width: '280px' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Buscar por remito, ID o proveedor..."
+                    value={searchPurchasesTerm}
+                    onChange={e => { setSearchPurchasesTerm(e.target.value); setCurrentPage(1); }}
+                    style={{ padding: '8px 12px 8px 36px', width: '100%', borderRadius: '8px', fontSize: '13px' }}
+                  />
+                  {searchPurchasesTerm && (
+                    <button 
+                      className="search-clear" 
+                      onClick={() => { setSearchPurchasesTerm(''); setCurrentPage(1); }}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                    >
+                      <X size={14} color="var(--color-text-muted)" />
+                    </button>
+                  )}
+                </div>
+                <select className="input" value={filterEdited} onChange={e => { setFilterEdited(e.target.value); setCurrentPage(1); }} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: '#fff', fontSize: '13px' }}>
                   <option value="Todos">Todos los remitos</option>
                   <option value="Editados">Solo Editados</option>
                 </select>
@@ -466,9 +740,10 @@ const Compras = ({ kiosco }) => {
               <table>
                 <thead>
                   <tr>
-                    <th>ID Remito</th>
+                    <th>N° Remito / ID</th>
                     <th>Fecha Ingreso</th>
                     <th>Origen / Proveedor</th>
+                    <th>Responsable</th>
                     <th>Artículos (Cant.)</th>
                     <th>Método de Pago</th>
                     <th style={{ textAlign: 'right' }}>Total (Costo)</th>
@@ -478,11 +753,25 @@ const Compras = ({ kiosco }) => {
                 <tbody>
                   {paginatedPurchases.map(purch => (
                     <tr key={purch.id}>
-                      <td style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>#{purch.id.toString().slice(-6)}</td>
+                      <td>
+                        {purch.remitoNumber ? (
+                          <div>
+                            <span style={{ fontWeight: 600, color: '#1a1f36' }}>{purch.remitoNumber}</span>
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>ID: #{purch.id.toString().slice(-6)}</div>
+                          </div>
+                        ) : (
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>#{purch.id.toString().slice(-6)}</span>
+                        )}
+                      </td>
                       <td>{formatShortDate(purch.date)}</td>
                       <td>
                         <span className="badge" style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                           {purch.supplierTerm}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '13px', color: purch.creatorName ? '#1a1f36' : 'var(--color-text-muted)', fontStyle: purch.creatorName ? 'normal' : 'italic' }}>
+                          {purch.creatorName || 'Histórico / Responsable no registrado'}
                         </span>
                       </td>
                       <td>{purch.items.reduce((acc, it) => acc + it.qty, 0)} u. ({purch.items.length} prod.)</td>
@@ -514,10 +803,17 @@ const Compras = ({ kiosco }) => {
                   ))}
                   {purchases.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: 'var(--color-text-muted)' }}>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '60px', color: 'var(--color-text-muted)' }}>
                         <Package size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
                         <div>No hay compras registradas en el historial.</div>
                         <div style={{ marginTop: '8px', fontSize: '13px' }}>Hacé clic en "Cargar remito" para ingresar mercadería.</div>
+                      </td>
+                    </tr>
+                  )}
+                  {purchases.length > 0 && filteredPurchases.length === 0 && (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+                        No se encontraron compras coincidentes con el filtro o búsqueda.
                       </td>
                     </tr>
                   )}
@@ -587,7 +883,13 @@ const Compras = ({ kiosco }) => {
                   {paginatedEdits.map(edit => (
                     <tr key={edit.id}>
                       <td>{formatShortDate(edit.editDate)}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>#{edit.purchaseId.toString().slice(-6)}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                        {(() => {
+                          const parentPurch = purchases.find(p => p.id === edit.purchaseId);
+                          const rem = edit.newRemitoNumber || edit.remitoNumber || (parentPurch && parentPurch.remitoNumber);
+                          return rem ? `${rem} (#${edit.purchaseId.toString().slice(-6)})` : `#${edit.purchaseId.toString().slice(-6)}`;
+                        })()}
+                      </td>
                       <td>{edit.supplierTerm}</td>
                       <td>
                         <span className="badge" style={{ backgroundColor: 'rgba(66, 133, 244, 0.1)', color: '#4285f4' }}>
@@ -626,7 +928,7 @@ const Compras = ({ kiosco }) => {
         <Modal 
           title={editingPurchaseId ? 'Editando Remito' : 'Recepción de Mercadería'} 
           minWidth="1200px"
-          onClose={() => { setView('list'); setCart([]); setEditingPurchaseId(null); }}
+          onClose={() => { setView('list'); setCart([]); setEditingPurchaseId(null); setRemitoNumber(''); }}
         >
           <div style={{ padding: '16px 24px', backgroundColor: '#f8f9fa', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div style={{ flex: 1 }}>
@@ -768,6 +1070,23 @@ const Compras = ({ kiosco }) => {
                   )}
                 </div>
 
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--color-text-muted)' }}>
+                    N° DE REMITO DEL PROVEEDOR (OPCIONAL)
+                  </label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    placeholder="Ej: 0001-00012345"
+                    value={remitoNumber}
+                    onChange={e => setRemitoNumber(e.target.value)}
+                    style={{ padding: '10px 14px', width: '100%', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: '#fff', fontSize: '14px' }}
+                  />
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    Permite letras, ceros y guiones del comprobante físico.
+                  </span>
+                </div>
+
                 <div style={{ margin: 'auto 0 0 0', backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: 'var(--color-text-muted)' }}>
                     <span>Unidades totales</span>
@@ -801,6 +1120,33 @@ const Compras = ({ kiosco }) => {
         </Modal>
       )}
       {renderSupplierModal()}
+      {renderAuthModal()}
+
+      {/* Modal Aviso Caja Cerrada para Operaciones en Efectivo */}
+      {cajaBlockedError && (
+        <div className="modal-overlay" onClick={() => setCajaBlockedError('')} style={{ zIndex: 3500, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(26, 31, 54, 0.6)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '440px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', padding: '28px', animation: 'scaleIn 0.2s ease-out' }}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(234, 67, 53, 0.1)', marginBottom: '14px' }}>
+                <Wallet size={28} color="#ea4335" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px 0', color: '#1a1f36' }}>Caja Cerrada</h3>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: '1.5', margin: 0 }}>
+                {cajaBlockedError}
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ padding: '12px 32px', borderRadius: '8px', fontWeight: 600, width: '100%' }}
+                onClick={() => setCajaBlockedError('')}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Proveedor Creado con Éxito */}
       {showSupplierSuccessModal && (

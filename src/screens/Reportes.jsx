@@ -4,6 +4,14 @@ import { DollarSign, ShoppingBag, Package, X, FileText, ChevronLeft, ChevronRigh
 
 const formatCur = (num) => `$ ${num.toLocaleString('es-AR')}`;
 
+const formatLocalDate = (date = new Date()) => {
+  const d = date instanceof Date ? date : new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const Modal = ({ title, onClose, children }) => (
   <div className="modal-overlay" onClick={onClose}>
     <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -25,10 +33,10 @@ const Reportes = ({ kiosco }) => {
   const [activeList, setActiveList] = useState('ventas'); // 'ventas' | 'movimientos'
   const [shiftsPage, setShiftsPage] = useState(1);
   const [showProfitModal, setShowProfitModal] = useState(false);
-  const [profitStartDate, setProfitStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [profitEndDate, setProfitEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [profitStartDate, setProfitStartDate] = useState(() => formatLocalDate());
+  const [profitEndDate, setProfitEndDate] = useState(() => formatLocalDate());
   const [filterPeriod, setFilterPeriod] = useState(caja.isOpen ? 'current_shift' : 'all_time');
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterDate, setFilterDate] = useState(() => formatLocalDate());
   const [filterMethod, setFilterMethod] = useState('Todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSale, setSelectedSale] = useState(null);
@@ -457,7 +465,6 @@ const Reportes = ({ kiosco }) => {
                    <tr>
                       <th style={{ padding: '6px 12px' }}>Apertura</th>
                       <th style={{ padding: '6px 12px' }}>Cierre</th>
-                      <th style={{ padding: '6px 12px' }}>Cajero</th>
                       <th style={{ textAlign: 'right', padding: '6px 12px' }}>Dif. Caja</th>
                       <th style={{ textAlign: 'right', width: '140px', padding: '6px 12px' }}>Arqueo COMPLETO</th>
                    </tr>
@@ -466,15 +473,18 @@ const Reportes = ({ kiosco }) => {
                    {paginatedShifts.map(shift => (
                       <tr key={shift.id}>
                          <td style={{ padding: '4px 12px' }}>
-                            <div style={{ fontWeight: 500 }}>{shift.openedDate}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{shift.openedAt}</div>
+                            <div style={{ fontWeight: 500 }}>{shift.openedDate} <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{shift.openedAt}</span></div>
+                            <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                               <span style={{ color: 'var(--color-text-muted)' }}>Abrió: </span>
+                               <span style={{ backgroundColor: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>{shift.openedByName || 'No registrado (versión anterior)'}</span>
+                            </div>
                          </td>
                          <td style={{ padding: '4px 12px' }}>
-                            <div style={{ fontWeight: 500 }}>{new Date(shift.closedAtDate).toLocaleDateString()}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{new Date(shift.closedAtDate).toLocaleTimeString()}</div>
-                         </td>
-                         <td style={{ padding: '4px 12px' }}>
-                            <span style={{ backgroundColor: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>{shift.openedByName}</span>
+                            <div style={{ fontWeight: 500 }}>{new Date(shift.closedAtDate).toLocaleDateString()} <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{new Date(shift.closedAtDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                            <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                               <span style={{ color: 'var(--color-text-muted)' }}>Cerró: </span>
+                               <span style={{ backgroundColor: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>{shift.closedByName || 'No registrado (versión anterior)'}</span>
+                            </div>
                          </td>
                          <td style={{ textAlign: 'right', padding: '4px 12px' }}>
                             <span style={{ 
@@ -493,7 +503,7 @@ const Reportes = ({ kiosco }) => {
                    ))}
                    {shifts.length === 0 && (
                       <tr>
-                         <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
+                         <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
                             No hay cierres de caja registrados aún.
                          </td>
                       </tr>
@@ -607,12 +617,16 @@ const Reportes = ({ kiosco }) => {
 
               <div style={{ marginBottom: '24px', fontSize: '14px' }}>
                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>Cajero en Turno:</span>
-                    <span style={{ fontWeight: 600 }}>{selectedShift.openedByName}</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>Responsable Apertura:</span>
+                    <span style={{ fontWeight: 600 }}>{selectedShift.openedByName || 'No registrado (versión anterior)'}</span>
                  </div>
                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ color: 'var(--color-text-muted)' }}>Apertura:</span>
                     <span style={{ fontWeight: 600 }}>{selectedShift.openedDate} {selectedShift.openedAt}</span>
+                 </div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>Responsable Cierre:</span>
+                    <span style={{ fontWeight: 600 }}>{selectedShift.closedByName || 'No registrado (versión anterior)'}</span>
                  </div>
                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ color: 'var(--color-text-muted)' }}>Cierre:</span>
@@ -784,7 +798,7 @@ const Reportes = ({ kiosco }) => {
                 className="btn btn-outline" 
                 style={{ padding: '3px 8px', fontSize: '12px' }}
                 onClick={() => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = formatLocalDate();
                   setProfitStartDate(today);
                   setProfitEndDate(today);
                 }}
@@ -796,10 +810,10 @@ const Reportes = ({ kiosco }) => {
                 className="btn btn-outline" 
                 style={{ padding: '3px 8px', fontSize: '12px' }}
                 onClick={() => {
-                  const today = new Date();
-                  const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-                  setProfitStartDate(past.toISOString().split('T')[0]);
-                  setProfitEndDate(today.toISOString().split('T')[0]);
+                  const now = new Date();
+                  const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+                  setProfitStartDate(formatLocalDate(past));
+                  setProfitEndDate(formatLocalDate(now));
                 }}
               >
                 Últimos 7 días
@@ -809,10 +823,10 @@ const Reportes = ({ kiosco }) => {
                 className="btn btn-outline" 
                 style={{ padding: '3px 8px', fontSize: '12px' }}
                 onClick={() => {
-                  const today = new Date();
-                  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                  setProfitStartDate(firstDay.toISOString().split('T')[0]);
-                  setProfitEndDate(today.toISOString().split('T')[0]);
+                  const now = new Date();
+                  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                  setProfitStartDate(formatLocalDate(firstDay));
+                  setProfitEndDate(formatLocalDate(now));
                 }}
               >
                 Este Mes
@@ -831,17 +845,30 @@ const Reportes = ({ kiosco }) => {
             </div>
             
             {(() => {
-              const [startYear, startMonth, startDay] = profitStartDate.split('-');
-              const start = new Date(startYear, startMonth - 1, startDay);
-              start.setHours(0, 0, 0, 0);
+              if (!profitStartDate || !profitEndDate) return null;
+              const [startYear, startMonth, startDay] = profitStartDate.split('-').map(Number);
+              const start = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
               
-              const [endYear, endMonth, endDay] = profitEndDate.split('-');
-              const end = new Date(endYear, endMonth - 1, endDay);
-              end.setHours(23, 59, 59, 999);
+              const [endYear, endMonth, endDay] = profitEndDate.split('-').map(Number);
+              const endExclusive = new Date(endYear, endMonth - 1, endDay + 1, 0, 0, 0, 0);
+
+              const startMs = start.getTime();
+              const endMs = endExclusive.getTime();
               
               const relevantSales = sales.filter(s => {
-                const saleDate = new Date(s.date).getTime();
-                return saleDate >= start.getTime() && saleDate <= end.getTime();
+                if (!s || !s.date) return false;
+                
+                // Si la fecha está almacenada como YYYY-MM-DD
+                if (typeof s.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.date)) {
+                  const [sY, sM, sD] = s.date.split('-').map(Number);
+                  const saleLocalMs = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+                  return saleLocalMs >= startMs && saleLocalMs < endMs;
+                }
+                
+                // Si es timestamp numérico o string ISO / fecha con hora
+                const saleDateMs = new Date(s.date).getTime();
+                if (isNaN(saleDateMs)) return false;
+                return saleDateMs >= startMs && saleDateMs < endMs;
               });
               
               let totalRevenue = 0;

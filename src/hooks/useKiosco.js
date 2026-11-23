@@ -17,13 +17,9 @@ const KEYS = {
 
 import { NICHES } from '../utils/mockData';
 import { generate5MonthsDemoData } from '../utils/demoDataGenerator';
-import { getInstallationId, calculateLicenseKey, isValidLicenseKey, saveCommerceProfile, getCommerceProfile } from '../services/installationService';
+import { getInstallationId, isValidProLicense, saveCommerceProfile, getCommerceProfile } from '../services/installationService';
 
-export const generateLicenseKey = (installationId) => {
-  return calculateLicenseKey(installationId);
-};
-
-export { isValidLicenseKey };
+export { isValidProLicense };
 
 
 export const useKiosco = () => {
@@ -133,17 +129,30 @@ export const useKiosco = () => {
     setSuppliers(nicheData.mockSuppliers || []);
     setClients(nicheData.mockClients || [{ id: 1, name: "Consumidor Final", cuit: "00-00000000-0", deuda: 0 }]);
 
+    // Garantizar que toda instalación nueva comience con cero transacciones ficticias
+    setSales([]);
+    setPurchases([]);
+    setShifts([]);
+    setReservations([]);
+    setCaja({ isOpen: false, efectivo: 0, openedAt: null, movimientos: [] });
+
     // Caja permanece cerrada por defecto al instalar
   }, []);
 
   // Verificación de integridad de licencia
   useEffect(() => {
+    let isMounted = true;
     if (businessConfig.plan === 'Pro') {
-      if (!isValidLicenseKey(businessConfig.installationId, businessConfig.licenseKey)) {
-        console.warn('Licencia inválida o faltante. Revirtiendo a Plan Básico.');
-        setBusinessConfig(prev => ({ ...prev, plan: 'Básico' }));
-      }
+      isValidProLicense(businessConfig.installationId, businessConfig.licenseKey).then(isValid => {
+        if (!isValid && isMounted) {
+          console.warn('Licencia inválida o faltante. Revirtiendo a Plan Básico.');
+          setBusinessConfig(prev => ({ ...prev, plan: 'Básico' }));
+        }
+      }).catch(err => {
+        console.error('Error al verificar integridad de licencia Pro:', err);
+      });
     }
+    return () => { isMounted = false; };
   }, []);
 
   // Persistencia automática
@@ -336,10 +345,22 @@ export const useKiosco = () => {
 
 
   const addPurchase = useCallback((purchaseData) => {
+    // Si el método de pago es Efectivo y la caja está cerrada, bloquear operación
+    if (purchaseData.method === 'Efectivo' && !caja.isOpen) {
+      console.warn('Operación bloqueada: No se puede registrar compra en efectivo con la caja cerrada.');
+      return { success: false, reason: 'CAJA_CLOSED', message: 'Para registrar esta operación en efectivo primero debés abrir la caja. La compra no fue guardada.' };
+    }
+
+    const nowIso = new Date().toISOString();
     const newPurchase = {
       ...purchaseData,
       id: Date.now(),
-      date: new Date().toISOString()
+      date: nowIso,
+      createdAt: nowIso,
+      creatorId: purchaseData.creatorId || null,
+      creatorName: purchaseData.creatorName || null,
+      remitoNumber: (purchaseData.remitoNumber || '').trim() || null,
+      edits: []
     };
     setPurchases(prev => [...prev, newPurchase]);
 
@@ -409,140 +430,319 @@ export const useKiosco = () => {
     if (purchaseData.method === 'Efectivo') {
       setCaja(prev => ({ ...prev, efectivo: prev.efectivo - purchaseData.total }));
     }
-  }, []);
+    return { success: true };
+  }, [caja.isOpen]);
 
 
-  const updatePurchase = useCallback((id, newData, modifierName = 'Sistema') => {
+  const updatePurchase = useCallback((id, newData, modifierInfo = 'Sistema') => {
     const oldPurchase = purchases.find(p => p.id === id);
     if (!oldPurchase) return;
 
-    const oldQty = oldPurchase.items.reduce((acc, it) => acc + it.qty, 0);
-    const newQty = newData.items.reduce((acc, it) => acc + it.qty, 0);
+    const modifierId = (typeof modifierInfo === 'object' && modifierInfo !== null) ? modifierInfo.id : null;
+    const modifierName = (typeof modifierInfo === 'object' && modifierInfo !== null) ? (modifierInfo.name || 'Sistema') : (modifierInfo || 'Sistema');
+
+    const oldQty = (oldPurchase.items || []).reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+    const newQty = (newData.items || []).reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
     
-    let changes = [];
-    if (oldQty !== newQty) changes.push('Cantidad');
-    
-    const oldCostsMap = oldPurchase.items.reduce((acc, it) => { acc[it.id] = (it.unitCost !== undefined ? it.unitCost : it.cost); return acc; }, {});
+    const changeSummaries = [];
+    const changeDetails = [];
+
+    // 1. Número de Remito
+    const oldRemito = (oldPurchase.remitoNumber || '').trim();
+    const newRemito = (newData.remitoNumber || '').trim();
+    if (oldRemito !== newRemito) {
+      changeSummaries.push('N° de Remito');
+      changeDetails.push({
+        field: 'N° de Remito',
+        changeType: 'remito',
+        oldValue: oldRemito || '(sin remito)',
+        newValue: newRemito || '(sin remito)'
+      });
+    }
+
+    // 2. Proveedor
+    const oldSupplier = (oldPurchase.supplierTerm || '').trim();
+    const newSupplier = (newData.supplierTerm || '').trim();
+    if (oldSupplier !== newSupplier) {
+      changeSummaries.push('Proveedor');
+      changeDetails.push({
+        field: 'Proveedor',
+        changeType: 'supplier',
+        oldValue: oldSupplier || 'Varios/General',
+        newValue: newSupplier || 'Varios/General'
+      });
+    }
+
+    // 3. Método de Pago
+    if (oldPurchase.method !== newData.method) {
+      changeSummaries.push('Método de Pago');
+      changeDetails.push({
+        field: 'Método de Pago',
+        changeType: 'payment_method',
+        oldValue: oldPurchase.method || 'Efectivo',
+        newValue: newData.method || 'Efectivo'
+      });
+    }
+
+    // 4. Total de la compra
+    if (oldPurchase.total !== newData.total) {
+      changeSummaries.push('Valor Total');
+      changeDetails.push({
+        field: 'Total de Compra',
+        changeType: 'total',
+        oldValue: `$ ${Number(oldPurchase.total || 0).toLocaleString('es-AR')}`,
+        newValue: `$ ${Number(newData.total || 0).toLocaleString('es-AR')}`
+      });
+    }
+
+    // Determinar si la edición requiere un movimiento neto de efectivo en caja
+    const oldCash = oldPurchase.method === 'Efectivo' ? Number(oldPurchase.total) || 0 : 0;
+    const newCash = newData.method === 'Efectivo' ? Number(newData.total) || 0 : 0;
+    const netCashChange = newCash - oldCash;
+    const requiresCashMovement = netCashChange !== 0;
+
+    // Si requiere movimiento de efectivo y la caja está cerrada, bloquear operación antes de cualquier mutación
+    if (requiresCashMovement && !caja.isOpen) {
+      console.warn('Operación bloqueada: No se puede modificar una compra que afecte el efectivo con la caja cerrada.');
+      return { success: false, reason: 'CAJA_CLOSED', message: 'Para registrar esta operación en efectivo primero debés abrir la caja. La compra no fue guardada.' };
+    }
+
+    // 5. Comparación detallada de ítems / productos por ID estable
+    const oldItemsMap = new Map();
+    (oldPurchase.items || []).forEach(it => {
+      const itCost = it.cost !== undefined ? it.cost : it.unitCost;
+      oldItemsMap.set(it.id, { ...it, cost: Number(itCost) || 0, qty: Number(it.qty) || 0, price: Number(it.price) || 0 });
+    });
+
+    const newItemsMap = new Map();
+    (newData.items || []).forEach(it => {
+      const itCost = it.cost !== undefined ? it.cost : it.unitCost;
+      newItemsMap.set(it.id, { ...it, cost: Number(itCost) || 0, qty: Number(it.qty) || 0, price: Number(it.price) || 0 });
+    });
+
+    // Productos retirados
+    for (const [itId, oldIt] of oldItemsMap.entries()) {
+      if (!newItemsMap.has(itId)) {
+        changeDetails.push({
+          field: `Producto: ${oldIt.name || 'ID ' + itId}`,
+          changeType: 'item_removed',
+          oldValue: `${oldIt.qty} u. (Costo: $${oldIt.cost})`,
+          newValue: 'Eliminado de la compra'
+        });
+      }
+    }
+
+    // Productos agregados o modificados
+    let qtyChanged = false;
     let costChanged = false;
-    if (oldPurchase.items.length !== newData.items.length) {
-      costChanged = true;
-    } else {
-      for (let item of newData.items) {
-        let currentItemCost = item.unitCost !== undefined ? item.unitCost : item.cost;
-        if (oldCostsMap[item.id] !== currentItemCost) {
+    let priceChanged = false;
+
+    for (const [itId, newIt] of newItemsMap.entries()) {
+      if (!oldItemsMap.has(itId)) {
+        changeDetails.push({
+          field: `Producto: ${newIt.name || 'ID ' + itId}`,
+          changeType: 'item_added',
+          oldValue: 'No incluido',
+          newValue: `${newIt.qty} u. (Costo: $${newIt.cost})`
+        });
+      } else {
+        const oldIt = oldItemsMap.get(itId);
+        const subChanges = [];
+        if (oldIt.qty !== newIt.qty) {
+          qtyChanged = true;
+          subChanges.push(`Cantidad: ${oldIt.qty} → ${newIt.qty} u.`);
+        }
+        if (oldIt.cost !== newIt.cost) {
           costChanged = true;
-          break;
+          subChanges.push(`Costo unitario: $${oldIt.cost} → $${newIt.cost}`);
+        }
+        if (oldIt.price !== newIt.price && (oldIt.price > 0 || newIt.price > 0)) {
+          priceChanged = true;
+          subChanges.push(`Precio venta: $${oldIt.price} → $${newIt.price}`);
+        }
+        if (subChanges.length > 0) {
+          changeDetails.push({
+            field: `Producto: ${newIt.name || 'ID ' + itId}`,
+            changeType: 'item_modified',
+            oldValue: `${oldIt.qty} u. (Costo: $${oldIt.cost}${oldIt.price ? ', Venta: $' + oldIt.price : ''})`,
+            newValue: `${newIt.qty} u. (Costo: $${newIt.cost}${newIt.price ? ', Venta: $' + newIt.price : ''})`,
+            subChanges
+          });
         }
       }
     }
-    if (costChanged) changes.push('Costo');
-    
-    if (oldPurchase.total !== newData.total) changes.push('Valor Total');
-    if (oldPurchase.method !== newData.method) changes.push('Método de Pago');
-    
-    if (changes.length === 0) changes.push('Datos generales');
+
+    if (oldQty !== newQty || qtyChanged) changeSummaries.push('Cantidad');
+    if (costChanged) changeSummaries.push('Costo');
+    if (priceChanged) changeSummaries.push('Precio de Venta');
+
+    if (changeSummaries.length === 0 && changeDetails.length === 0) {
+      changeSummaries.push('Datos generales');
+    }
 
     const editLog = {
       id: Date.now(),
       editDate: new Date().toISOString(),
+      modifierId,
       modifierName,
       oldTotal: oldPurchase.total,
       newTotal: newData.total,
       oldItemsCount: oldQty,
       newItemsCount: newQty,
-      changesSummary: changes.join(', ')
+      changesSummary: changeSummaries.join(', ') || 'Modificación general',
+      details: changeDetails
     };
 
     const updatedPurchase = {
       ...newData,
       id: oldPurchase.id,
       date: oldPurchase.date,
+      createdAt: oldPurchase.createdAt || oldPurchase.date,
+      creatorId: oldPurchase.creatorId !== undefined ? oldPurchase.creatorId : null,
+      creatorName: oldPurchase.creatorName !== undefined ? oldPurchase.creatorName : null,
+      remitoNumber: (newData.remitoNumber || '').trim() || null,
       isEdited: true,
       edits: [...(oldPurchase.edits || []), editLog]
     };
 
     setPurchases(prev => prev.map(p => p.id === id ? updatedPurchase : p));
 
-    // Consolidar rollback y aplicar nuevos a Productos
-    setProducts(prev => {
-      const oldQty = {};
-      oldPurchase.items.forEach(old => {
-        const q = Number(old.qty) || 0;
-        oldQty[old.id] = (oldQty[old.id] || 0) + q;
-      });
+    // Determinar si los ítems realmente cambiaron para no alterar stock ni costos innecesariamente
+    const itemsChanged = (oldPurchase.items || []).length !== (newData.items || []).length ||
+      qtyChanged || costChanged || priceChanged ||
+      changeDetails.some(d => d.changeType === 'item_added' || d.changeType === 'item_removed');
 
-      const newQty = {};
-      const newCosts = {};
-      updatedPurchase.items.forEach(newItem => {
-        const q = Number(newItem.qty) || 0;
-        newQty[newItem.id] = (newQty[newItem.id] || 0) + q;
-        const itemCost = newItem.cost !== undefined ? newItem.cost : newItem.unitCost;
-        if (itemCost !== undefined && itemCost !== null) {
-          newCosts[newItem.id] = Number(itemCost) || 0;
-        }
-      });
+    if (itemsChanged) {
+      // Consolidar rollback y aplicar nuevos a Productos
+      setProducts(prev => {
+        const oldQtyMap = {};
+        (oldPurchase.items || []).forEach(old => {
+          const q = Number(old.qty) || 0;
+          oldQtyMap[old.id] = (oldQtyMap[old.id] || 0) + q;
+        });
 
-      return prev.map(p => {
-        if (oldQty[p.id] || newQty[p.id]) {
-          let currentStock = Number(p.stock) || 0;
-          // Revertir
-          if (oldQty[p.id]) currentStock = Math.max(0, currentStock - (Number(oldQty[p.id]) || 0));
-          // Aplicar nuevo
-          if (newQty[p.id]) currentStock += (Number(newQty[p.id]) || 0);
-          
-          const updatedCost = newCosts[p.id] !== undefined ? newCosts[p.id] : p.cost;
-          
-          const pItem = updatedPurchase.items.find(i => i.id === p.id);
-          let updatedPrice = p.price;
-          let updatedMargin = p.margin;
+        const newQtyMap = {};
+        const newCosts = {};
+        (updatedPurchase.items || []).forEach(newItem => {
+          const q = Number(newItem.qty) || 0;
+          newQtyMap[newItem.id] = (newQtyMap[newItem.id] || 0) + q;
+          const itemCost = newItem.cost !== undefined ? newItem.cost : newItem.unitCost;
+          if (itemCost !== undefined && itemCost !== null) {
+            newCosts[newItem.id] = Number(itemCost) || 0;
+          }
+        });
 
-          if (pItem && pItem.price !== undefined) {
-             updatedPrice = pItem.price;
-             updatedMargin = pItem.margin !== undefined ? pItem.margin : p.margin;
-          } else {
-             // Si el costo cambia, recalculamos precio en base al margen
-             if (updatedCost !== p.cost) {
-               if (p.margin !== undefined && p.margin > 0) {
-                 updatedPrice = Math.round(updatedCost * (1 + p.margin / 100) * 100) / 100;
-               } else if (p.cost > 0 && p.price > 0) {
-                 const marginRatio = p.price / p.cost;
-                 updatedPrice = Math.round(updatedCost * marginRatio * 100) / 100;
+        return prev.map(p => {
+          if (oldQtyMap[p.id] || newQtyMap[p.id]) {
+            let currentStock = Number(p.stock) || 0;
+            // Revertir
+            if (oldQtyMap[p.id]) currentStock = Math.max(0, currentStock - (Number(oldQtyMap[p.id]) || 0));
+            // Aplicar nuevo
+            if (newQtyMap[p.id]) currentStock += (Number(newQtyMap[p.id]) || 0);
+            
+            const updatedCost = newCosts[p.id] !== undefined ? newCosts[p.id] : p.cost;
+            
+            const pItem = updatedPurchase.items.find(i => i.id === p.id);
+            let updatedPrice = p.price;
+            let updatedMargin = p.margin;
+
+            if (pItem && pItem.price !== undefined) {
+               updatedPrice = pItem.price;
+               updatedMargin = pItem.margin !== undefined ? pItem.margin : p.margin;
+            } else {
+               // Si el costo cambia, recalculamos precio en base al margen
+               if (updatedCost !== p.cost) {
+                 if (p.margin !== undefined && p.margin > 0) {
+                   updatedPrice = Math.round(updatedCost * (1 + p.margin / 100) * 100) / 100;
+                 } else if (p.cost > 0 && p.price > 0) {
+                   const marginRatio = p.price / p.cost;
+                   updatedPrice = Math.round(updatedCost * marginRatio * 100) / 100;
+                 }
                }
-             }
-          }
+            }
 
-          let updatedPriceNet = p.priceNet;
-          if (p.iva && p.iva > 0) {
-            updatedPriceNet = Math.round((updatedPrice / (1 + p.iva / 100)) * 100) / 100;
-          }
+            let updatedPriceNet = p.priceNet;
+            if (p.iva && p.iva > 0) {
+              updatedPriceNet = Math.round((updatedPrice / (1 + p.iva / 100)) * 100) / 100;
+            }
 
-          return {
-            ...p,
-            stock: currentStock,
-            cost: updatedCost,
-            price: updatedPrice,
-            margin: updatedMargin,
-            priceNet: updatedPriceNet
-          };
-        }
-        return p;
+            return {
+              ...p,
+              stock: currentStock,
+              cost: updatedCost,
+              price: updatedPrice,
+              margin: updatedMargin,
+              priceNet: updatedPriceNet
+            };
+          }
+          return p;
+        });
       });
-    });
+    }
 
-    // Consolidar rollback y aplicar caja
-    setCaja(prev => {
-      let nuevoEfectivo = prev.efectivo;
-      if (oldPurchase.method === 'Efectivo') nuevoEfectivo += oldPurchase.total;
-      if (updatedPurchase.method === 'Efectivo') nuevoEfectivo -= updatedPurchase.total;
-      return { ...prev, efectivo: nuevoEfectivo };
-    });
-  }, [purchases]);
+    // Consolidar rollback y aplicar caja SOLO si requiere movimiento de efectivo
+    if (requiresCashMovement) {
+      setCaja(prev => {
+        let nuevoEfectivo = prev.efectivo;
+        if (oldPurchase.method === 'Efectivo') nuevoEfectivo += oldPurchase.total;
+        if (updatedPurchase.method === 'Efectivo') nuevoEfectivo -= updatedPurchase.total;
+        return { ...prev, efectivo: nuevoEfectivo };
+      });
+    }
 
+    return { success: true };
+  }, [purchases, caja.isOpen]);
 
   const addClient = useCallback((client) => {
     const newClient = { ...client, id: Date.now(), deuda: 0, createdAt: new Date().toISOString() };
     setClients(prev => [...prev, newClient]);
     return newClient;
+  }, []);
+
+  const batchImportClients = useCallback((importedClients) => {
+    let addedCount = 0;
+    setClients(prev => {
+      const existingNames = new Set(
+        prev.map(c => (c.name || '').trim().toLowerCase()).filter(Boolean)
+      );
+      const existingCuits = new Set(
+        prev
+          .map(c => (c.cuit || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''))
+          .filter(c => c && c !== 'consumidorfinal' && c !== '0')
+      );
+
+      const toAdd = [];
+      const now = Date.now();
+
+      importedClients.forEach((c) => {
+        const cleanName = (c.name || '').trim();
+        if (!cleanName) return;
+
+        const normName = cleanName.toLowerCase();
+        const rawCuit = (c.cuit || '').trim();
+        const normCuit = rawCuit.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isCuitValid = normCuit && normCuit !== 'consumidorfinal' && normCuit !== '0';
+
+        const isDuplicate = existingNames.has(normName) || (isCuitValid && existingCuits.has(normCuit));
+
+        if (!isDuplicate) {
+          toAdd.push({
+            id: now + addedCount,
+            name: cleanName,
+            cuit: rawCuit || 'Consumidor Final',
+            phone: (c.phone || '').trim(),
+            deuda: 0,
+            createdAt: new Date().toISOString()
+          });
+          existingNames.add(normName);
+          if (isCuitValid) existingCuits.add(normCuit);
+          addedCount++;
+        }
+      });
+
+      return [...prev, ...toAdd];
+    });
+    return addedCount;
   }, []);
 
 
@@ -552,8 +752,35 @@ export const useKiosco = () => {
 
 
   const deleteClient = useCallback((id) => {
+    if (id === 1) {
+      return { success: false, reason: 'SYSTEM_CLIENT', message: 'No se puede eliminar el cliente de sistema Consumidor Final.' };
+    }
+
+    const target = clients.find(c => c.id === id);
+    if (!target) {
+      return { success: false, reason: 'NOT_FOUND', message: 'Cliente no encontrado.' };
+    }
+
+    if ((target.deuda || 0) > 0) {
+      return { 
+        success: false, 
+        reason: 'HAS_DEBT', 
+        message: `No es posible eliminar a "${target.name}" porque tiene una deuda activa de $${(target.deuda || 0).toLocaleString('es-AR')}. Debe regularizar o saldar su cuenta corriente antes de poder eliminarlo.` 
+      };
+    }
+
+    const hasSales = (sales || []).some(s => s.clientId === id || (s.client && target.name && s.client.trim().toLowerCase() === target.name.trim().toLowerCase()));
+    if (hasSales) {
+      return { 
+        success: false, 
+        reason: 'HAS_SALES', 
+        message: `No es posible eliminar a "${target.name}" porque posee ventas históricas registradas. Para proteger la integridad de los comprobantes y estadísticas contables, este cliente no puede ser eliminado.` 
+      };
+    }
+
     setClients(prev => prev.filter(c => c.id !== id));
-  }, []);
+    return { success: true, message: `Cliente "${target.name}" eliminado correctamente.` };
+  }, [clients, sales]);
 
 
   const payDebt = useCallback((clientId, amount, clientName = 'Desconocido', method = 'Efectivo', userName = 'Sistema') => {
@@ -611,7 +838,18 @@ export const useKiosco = () => {
       closedAtDate: new Date().toISOString()
     };
     setShifts(prev => [newShift, ...prev]);
-    setCaja({ isOpen: false, efectivo: 0, openedAt: null, openedDate: null, openedTimestamp: null, openedBy: null, openedByName: null, movimientos: [] });
+    setCaja({ 
+      isOpen: false, 
+      efectivo: 0, 
+      openedAt: null, 
+      openedDate: null, 
+      openedTimestamp: null, 
+      openedBy: null, 
+      openedByName: null, 
+      activeUserId: null, 
+      activeUserName: null, 
+      movimientos: [] 
+    });
   }, []);
 
   const addReservation = useCallback((reservation) => {
@@ -650,6 +888,7 @@ export const useKiosco = () => {
     addPurchase,
     updatePurchase,
     addClient,
+    batchImportClients,
     updateClient,
     deleteClient,
     addUser,
@@ -674,7 +913,7 @@ export const useKiosco = () => {
     setCheckoutReservation
   }), [
     products, sales, purchases, clients, caja, users, categoryTree, suppliers, businessConfig, shifts, reservations, checkoutReservation,
-    addProduct, updateProduct, deleteProduct, deleteProducts, deleteAllProducts, clearAllData, loadDemoData, updateGlobalMargin, batchImportProducts, addSale, addPurchase, updatePurchase, addClient, updateClient, deleteClient, addUser, updateUser, deleteUser, updateCaja, payDebt, closeCajaAndSaveShift, completeOnboarding, addReservation, updateReservation, deleteReservation
+    addProduct, updateProduct, deleteProduct, deleteProducts, deleteAllProducts, clearAllData, loadDemoData, updateGlobalMargin, batchImportProducts, addSale, addPurchase, updatePurchase, addClient, batchImportClients, updateClient, deleteClient, addUser, updateUser, deleteUser, updateCaja, payDebt, closeCajaAndSaveShift, completeOnboarding, addReservation, updateReservation, deleteReservation
   ]);
 
   return contextValue;

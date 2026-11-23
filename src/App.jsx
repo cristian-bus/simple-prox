@@ -22,10 +22,16 @@ function App() {
   const [globalAdminAuthed, setGlobalAdminAuthed] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const kiosco = useKiosco();
-  const ofertas = useOfertas(kiosco);
+  
+  // License States
+  const [licenseChecked, setLicenseChecked] = useState(false);
+  const [licenseValid, setLicenseValid] = useState(true);
+  const [legacyMode, setLegacyMode] = useState(false);
 
-  const activeUser = kiosco.caja.isOpen ? kiosco.users.find(u => u.id === kiosco.caja.openedBy) : null;
+  const kiosco = useKiosco();
+  const ofertas = useOfertas(kiosco, currentScreen === 'punto-venta');
+
+  const activeUser = kiosco.caja.isOpen ? kiosco.users.find(u => u.id === (kiosco.caja.activeUserId || kiosco.caja.openedBy)) : null;
   const isProtectedTab = ['productos', 'inventario', 'usuarios', 'reportes', 'configuracion'].includes(currentScreen);
   
   // Si la caja la tiene abierta un Admin, tiene permisos. O si entró el PIn global
@@ -48,12 +54,12 @@ function App() {
     }
   };
 
-  // Si abren u operan la caja, resetear el authed global para mantener candado
+  // Si abren u operan la caja o cambia el operador activo, resetear el authed global para mantener candado
   React.useEffect(() => {
      if(kiosco.caja.isOpen) {
         setGlobalAdminAuthed(false);
      }
-  }, [kiosco.caja.isOpen]);
+  }, [kiosco.caja.isOpen, kiosco.caja.activeUserId]);
 
   // Disable scroll to change value on all number inputs globally
   useEffect(() => {
@@ -91,7 +97,100 @@ function App() {
     }
   };
 
-  if (!kiosco.businessConfig?.isActivated) {
+  const [licensePendingLock, setLicensePendingLock] = useState(false);
+
+  useEffect(() => {
+    let intervalId;
+    let lockCheckInterval;
+    
+    async function checkLicense() {
+      if (import.meta.env.DEV) {
+        const { isLocalDemoActive } = await import('./utils/devDemoMode.js');
+        if (isLocalDemoActive()) {
+          setLicenseValid(true);
+          setLegacyMode(false);
+          setLicenseChecked(true);
+          return;
+        }
+      }
+
+      if (!kiosco.businessConfig?.isActivated) {
+        setLicenseChecked(true);
+        setLicenseValid(false);
+        return;
+      }
+      
+      const token = localStorage.getItem('kioscoprox_license_token');
+      if (token) {
+        try {
+          const { verifyBasicActivationCertificate, verifyEd25519License } = await import('./utils/licenseCrypto.js');
+          const instId = kiosco.businessConfig?.installationId || '';
+          
+          // Intentar validar como certificado Básico
+          let result = await verifyBasicActivationCertificate(token, instId);
+          
+          // Si no es un certificado básico, intentar con verifyEd25519License para tokens anteriores
+          if (!result.valid && verifyEd25519License) {
+            const legacyRes = await verifyEd25519License(token, instId);
+            if (legacyRes.valid) {
+              result = legacyRes;
+            }
+          }
+
+          if (result.valid) {
+            setLicenseValid(true);
+            setLegacyMode(false);
+            setLicensePendingLock(false);
+          } else {
+            // Expired or invalid
+            setLegacyMode(false);
+            if (window.__ACTIVE_SALE__) {
+              setLicensePendingLock(true);
+            } else {
+              setLicenseValid(false);
+            }
+          }
+        } catch(e) {
+          if (window.__ACTIVE_SALE__) {
+            setLicensePendingLock(true);
+          } else {
+            setLicenseValid(false);
+          }
+        }
+      } else {
+        setLicenseValid(false);
+        setLegacyMode(false);
+      }
+      setLicenseChecked(true);
+    }
+
+    
+    checkLicense();
+    
+    // Check expiration every hour, independently of cash register
+    intervalId = setInterval(() => {
+       checkLicense();
+    }, 60 * 60 * 1000);
+    
+    // Check if we need to lock after the sale finishes
+    lockCheckInterval = setInterval(() => {
+       if (licensePendingLock && !window.__ACTIVE_SALE__) {
+         setLicenseValid(false);
+         setLicensePendingLock(false);
+       }
+    }, 5000);
+    
+    return () => {
+      clearInterval(intervalId);
+      clearInterval(lockCheckInterval);
+    };
+  }, [kiosco.businessConfig?.isActivated, kiosco.businessConfig?.installationId, licensePendingLock]);
+
+  if (!licenseChecked) {
+    return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a', color: 'white' }}>Verificando licencia...</div>;
+  }
+
+  if (!licenseValid) {
     return <ActivationGuard kiosco={kiosco} />;
   }
 
@@ -101,7 +200,9 @@ function App() {
 
   return (
     <div className={`app-container ${navCollapsed ? 'nav-collapsed' : ''}`}>
+      {import.meta.env.DEV && <DevDemoBanner />}
       <main className="main-content">
+
         <div style={{ display: currentScreen === 'punto-venta' ? 'block' : 'none', height: '100%' }}>
           <PuntoDeVenta kiosco={kiosco} ofertas={ofertas} setGlobalAdminAuthed={setGlobalAdminAuthed} />
         </div>
@@ -195,6 +296,54 @@ function App() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DevDemoBanner() {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    let isMounted = true;
+    import('./utils/devDemoMode.js').then(m => {
+      if (isMounted) setActive(m.isLocalDemoActive());
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  if (!active) return null;
+
+  return (
+    <div style={{
+      backgroundColor: '#7c3aed',
+      color: '#ffffff',
+      padding: '8px 16px',
+      fontSize: '12px',
+      fontWeight: 600,
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      zIndex: 99999,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+    }}>
+      <span>🧪 MODO DEMOSTRACIÓN LOCAL (DEV) — Entorno de pruebas 100% aislado. Sin peticiones remotas ni impacto en Supabase.</span>
+      <button
+        onClick={async () => {
+          const { stopLocalDemo } = await import('./utils/devDemoMode.js');
+          stopLocalDemo();
+        }}
+        style={{
+          background: 'rgba(255,255,255,0.2)',
+          border: '1px solid rgba(255,255,255,0.4)',
+          color: '#ffffff',
+          padding: '4px 12px',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          fontWeight: 700
+        }}
+      >
+        Salir del Modo Demo
+      </button>
     </div>
   );
 }
