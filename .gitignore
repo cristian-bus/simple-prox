@@ -15,6 +15,29 @@ release/*
 scratch
 *.local
 *.exe
+*.pem
+*.bak
+*.tmp
+*.dump
+backups/
+tests/.pilot_cred_active.json
+tests/.pilot_cleanup_pending.json
+tests/e2e_baseline_state.json
+.test_isolated*
+
+# Administrative tools and local test artifacts (excluded from commercial POS repo)
+admin-tools/
+DOCUMENTACION_IA.rar
+ad_config.json
+backup-test-artifacts-1.3.12/
+*.patch
+comparacion_terminal_sync.txt
+extracted_revoke.json
+revoke_function.txt
+start-isolated-test.ps1
+supabase/.branches/
+supabase/.temp/
+*.deployed_backup
 
 # Editor directories and files
 .vscode/*

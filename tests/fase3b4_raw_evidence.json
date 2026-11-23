@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-11-06T22:16:29.926Z",
+  "engine": "PostgreSQL 17.11",
+  "container": "pg_isolated_fase3b",
+  "tests": {
+    "bigint_hash_measurement": {
+      "10000": {
+        "count": 10000,
+        "heap_bytes": 450560,
+        "index_bytes": 319488,
+        "total_bytes": 794624,
+        "heap_pretty": "440 kB",
+        "index_pretty": "312 kB",
+        "total_pretty": "776 kB",
+        "bytes_per_id": 79.46
+      },
+      "50000": {
+        "count": 50000,
+        "heap_bytes": 2220032,
+        "index_bytes": 1327104,
+        "total_bytes": 3571712,
+        "heap_pretty": "2168 kB",
+        "index_pretty": "1296 kB",
+        "total_pretty": "3488 kB",
+        "bytes_per_id": 71.43
+      },
+      "100000": {
+        "count": 100000,
+        "heap_bytes": 4431872,
+        "index_bytes": 2686976,
+        "total_bytes": 7143424,
+        "heap_pretty": "4328 kB",
+        "index_pretty": "2624 kB",
+        "total_pretty": "6976 kB",
+        "bytes_per_id": 71.43
+      },
+      "200000": {
+        "count": 200000,
+        "heap_bytes": 8863744,
+        "index_bytes": 5398528,
+        "total_bytes": 14286848,
+        "heap_pretty": "8656 kB",
+        "index_pretty": "5272 kB",
+        "total_pretty": "14 MB",
+        "bytes_per_id": 71.43
+      }
+    },
+    "full_outer_join_reconciliation": {
+      "balanced": {
+        "total_groups": 12,
+        "status_summary": {
+          "PERFECT_MATCH": 12
+        },
+        "all_perfect": true
+      },
+      "anomaly_detection": {
+        "total_groups": 14,
+        "status_summary": {
+          "PERFECT_MATCH": 12,
+          "ORPHAN_AGGREGATE": 1,
+          "MISSING_IN_AGGREGATES": 1
+        },
+        "detected_orphan_aggregate": true,
+        "detected_missing_in_aggregates": true
+      }
+    },
+    "purge_safety_check": {
+      "purge_prevented_properly": true,
+      "total_raw_remaining": 110,
+      "consolidated_preserved": true,
+      "pending_preserved": true
+    },
+    "late_events_effect": {
+      "quota_before": {
+        "campaign_id": "camp-quota-test",
+        "daily_limit": 50,
+        "impressions_today": 25,
+        "is_quota_exhausted": false
+      },
+      "quota_after": {
+        "campaign_id": "camp-quota-test",
+        "daily_limit": 50,
+        "impressions_today": 25,
+        "is_quota_exhausted": false
+      },
+      "quota_isolated": true,
+      "combined_metrics_total": true,
+      "daily_breakdown_correct": false
+    }
+  }
+}

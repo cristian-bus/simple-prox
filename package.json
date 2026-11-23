@@ -1,7 +1,7 @@
 {
   "name": "simple-prox",
   "private": true,
-  "version": "1.3.9",
+  "version": "1.3.13",
   "author": "Simple ProX",
   "description": "Sistema Simple ProX Desktop",
   "type": "module",
@@ -18,9 +18,16 @@
   "build": {
     "appId": "com.simpleprox.app",
     "productName": "Simple ProX",
+    "artifactName": "Simple-ProX-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/icon.ico",
+      "package.json"
+    ],
     "publish": [
       {
         "provider": "github",

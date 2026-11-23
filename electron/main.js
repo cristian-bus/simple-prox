@@ -1,6 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, safeStorage, dialog } from 'electron';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { writeBackupFileAtomic } from './safeBackupWriter.js';
 import electronUpdater from 'electron-updater';
 const { autoUpdater } = electronUpdater;
 
@@ -197,6 +199,141 @@ function isSafeExternalUrl(rawUrl) {
       shell.openExternal(url).catch(err => console.error('[Main] Error abriendo external URL:', err));
     } else {
       console.warn('[Main] Intento bloqueado por política de seguridad en open-external:', url);
+    }
+  });
+
+  ipcMain.handle('save-backup-file', async (event, { defaultFileName, fileContent }) => {
+    try {
+      const { canceled, filePath } = await dialog.showSaveDialog(win, {
+        title: 'Guardar copia de seguridad - Simple ProX',
+        defaultPath: defaultFileName,
+        filters: [
+          { name: 'Copia de Seguridad Simple ProX (*.spx)', extensions: ['spx'] },
+          { name: 'Archivo JSON (*.json)', extensions: ['json'] }
+        ]
+      });
+
+      if (canceled || !filePath) {
+        return { success: false, canceled: true };
+      }
+
+      return await writeBackupFileAtomic(filePath, fileContent);
+    } catch (err) {
+      console.error('[Main] Error en diálogo o guardado de respaldo:', err);
+      return { success: false, error: err?.message || 'Error al procesar la copia de seguridad' };
+    }
+  });
+
+  ipcMain.handle('read-backup-file', async () => {
+    try {
+      const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+        title: 'Seleccionar copia de seguridad - Simple ProX',
+        filters: [
+          { name: 'Copia de Seguridad Simple ProX (*.spx)', extensions: ['spx'] },
+          { name: 'Archivo JSON (*.json)', extensions: ['json'] },
+          { name: 'Todos los archivos (*.*)', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+      });
+
+      if (canceled || !filePaths || filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const filePath = filePaths[0];
+      const fileContent = await fs.promises.readFile(filePath, 'utf8');
+      return { success: true, filePath, fileContent };
+    } catch (err) {
+      console.error('[Main] Error abriendo archivo de respaldo:', err);
+      return { success: false, error: err?.message || 'Error al leer el archivo seleccionado' };
+    }
+  });
+
+  // =========================================================================
+  // INFRAESTRUCTURA DE RECUPERACIÓN ANTE RESTAURACIONES INTERRUMPIDAS (ETAPA 5B.2)
+  // =========================================================================
+  const getRecoveryDirs = () => {
+    const recoveryDir = path.join(app.getPath('userData'), 'recovery');
+    const snapshotsDir = path.join(recoveryDir, 'snapshots');
+    const journalPath = path.join(recoveryDir, 'restore_journal.json');
+    return { recoveryDir, snapshotsDir, journalPath };
+  };
+
+  ipcMain.handle('recovery-check-journal', async () => {
+    try {
+      const { journalPath } = getRecoveryDirs();
+      if (fs.existsSync(journalPath)) {
+        const raw = await fs.promises.readFile(journalPath, 'utf8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[Main] Advertencia leyendo journal de recuperación:', e);
+    }
+    return null;
+  });
+
+  ipcMain.handle('recovery-save-journal', async (event, journal) => {
+    try {
+      const { recoveryDir, journalPath } = getRecoveryDirs();
+      await fs.promises.mkdir(recoveryDir, { recursive: true });
+      const content = JSON.stringify(journal, null, 2);
+      return await writeBackupFileAtomic(journalPath, content);
+    } catch (err) {
+      console.error('[Main] Error guardando journal de recuperación:', err);
+      return { success: false, error: err?.message || 'Error al guardar journal' };
+    }
+  });
+
+  ipcMain.handle('recovery-clear-journal', async () => {
+    try {
+      const { journalPath } = getRecoveryDirs();
+      if (fs.existsSync(journalPath)) {
+        await fs.promises.unlink(journalPath);
+      }
+      return { success: true };
+    } catch (err) {
+      console.warn('[Main] Advertencia eliminando journal de recuperación:', err);
+      return { success: false, error: err?.message || 'Error al limpiar journal' };
+    }
+  });
+
+  ipcMain.handle('recovery-save-snapshot', async (event, snapshot) => {
+    try {
+      const { snapshotsDir } = getRecoveryDirs();
+      await fs.promises.mkdir(snapshotsDir, { recursive: true });
+      const snapFileName = `emergency_snapshot_${snapshot.snapshotId || Date.now()}.json`;
+      const snapPath = path.join(snapshotsDir, snapFileName);
+      const content = JSON.stringify(snapshot, null, 2);
+      const writeRes = await writeBackupFileAtomic(snapPath, content);
+      if (writeRes.success) {
+        return { success: true, snapshotPath: snapPath };
+      }
+      return writeRes;
+    } catch (err) {
+      console.error('[Main] Error guardando snapshot interno de emergencia:', err);
+      return { success: false, error: err?.message || 'Error al guardar snapshot' };
+    }
+  });
+
+  ipcMain.handle('recovery-read-snapshot', async (event, snapshotPath) => {
+    try {
+      if (!snapshotPath || typeof snapshotPath !== 'string') {
+        return { success: false, error: 'Ruta de snapshot no especificada.' };
+      }
+      const resolved = path.resolve(snapshotPath);
+      const resolvedUserData = path.resolve(app.getPath('userData'));
+      if (!resolved.toLowerCase().startsWith(resolvedUserData.toLowerCase())) {
+        return { success: false, error: 'Acceso denegado: la ruta del snapshot debe pertenecer al perfil de usuario.' };
+      }
+      if (!fs.existsSync(resolved)) {
+        return { success: false, error: 'Archivo de snapshot no encontrado en disco.' };
+      }
+      const raw = await fs.promises.readFile(resolved, 'utf8');
+      const snapshot = JSON.parse(raw);
+      return { success: true, snapshot };
+    } catch (err) {
+      console.error('[Main] Error leyendo snapshot interno:', err);
+      return { success: false, error: err?.message || 'Error al leer snapshot' };
     }
   });
 }

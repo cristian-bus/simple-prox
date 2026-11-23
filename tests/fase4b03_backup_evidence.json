@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-11-10T01:02:11.223Z",
+  "environment": "PostgreSQL 17.11 on Alpine Linux (pg_isolated_fase3b)",
+  "tests": [
+    {
+      "name": "Prueba 1: Ejecucion exitosa de backup_supabase_manual.ps1",
+      "passed": true,
+      "details": {
+        "success": true,
+        "path": "C:\\Users\\Pininas\\KioscoProX\\admin-tools\\..\\backups\\supabase_backup_20261109_220212.dump",
+        "outputSnippet": "==========\n=== RESPALDO MANUAL COMPLETADO EXITOSAMENTE ===\nUbicacion: C:\\Users\\Pininas\\KioscoProX\\admin-tools\\..\\backups\\supabase_backup_20261109_220212.dump\nSHA-256:   7aabc727810ca470e7e8f833a567ca902437fb8979d63a070764e1fec25381ed\n================================================================\n\n"
+      }
+    },
+    {
+      "name": "Prueba 2: Archivo binario valido, tamano > 0 y TOC completo con datos y ACLs",
+      "passed": true,
+      "details": {
+        "fileSize": 2646416,
+        "sha256": "7AABC727810CA470E7E8F833A567CA902437FB8979D63A070764E1FEC25381ED",
+        "hasCampaignEvents": true,
+        "hasCampaigns": true,
+        "hasAdminUsers": true,
+        "hasAcls": true
+      }
+    },
+    {
+      "name": "Prueba 3: Restauracion completa de prueba sin errores en base aislada",
+      "passed": true,
+      "details": {
+        "success": true,
+        "hasSuccessBanner": true,
+        "eventsRecovered": true,
+        "rlsRecovered": true,
+        "outputSnippet": "_log|ALL\n  purge_ledger|Allow authenticated read purge_ledger|SELECT\n  purge_ledger|Allow service_role full purge_ledger|ALL\n\n================================================================\n=== VERIFICACION EXITOSA: EL RESPALDO ES 100% RESTAURABLE ===\n================================================================\n\nLimpiando base de datos temporal 'tmp_backup_verify_20261109_220218_v10jvmgd'...\n"
+      }
+    },
+    {
+      "name": "Prueba 4: Archivos de respaldo protegidos en .gitignore (fuera de Git)",
+      "passed": true,
+      "details": {
+        "gitignoreRulePresent": true
+      }
+    }
+  ]
+}

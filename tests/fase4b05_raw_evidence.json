@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-11-10T01:20:14.055Z",
+  "environment": "PostgreSQL 17.11 on Alpine Linux (pg_isolated_fase3b)",
+  "totalTests": 16,
+  "passedTests": 16,
+  "tests": [
+    {
+      "case": 1,
+      "name": "Backup correcto con exit code 0 y archivo binario generado",
+      "passed": true,
+      "details": {
+        "exitCode": 0,
+        "backupPath": "C:\\Users\\Pininas\\KioscoProX\\admin-tools\\..\\backups\\supabase_backup_20261109_222015.dump",
+        "size": 2646416,
+        "hash": "35fcc9165fd3456974a151ba91c45b0497fad990423133bc1c9ebdf16dc80983"
+      }
+    },
+    {
+      "case": 2,
+      "name": "Transferencia integra: SHA-256 coincide y TOC es legible",
+      "passed": true,
+      "details": {
+        "expectedHash": "35fcc9165fd3456974a151ba91c45b0497fad990423133bc1c9ebdf16dc80983",
+        "hostHash": "35fcc9165fd3456974a151ba91c45b0497fad990423133bc1c9ebdf16dc80983",
+        "tocValid": true
+      }
+    },
+    {
+      "case": 3,
+      "name": "Deteccion obligatoria de corrupcion binaria ante mismatch SHA-256",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "outputDetected": "[ERROR CRITICO] Falla critica de integridad binaria: El hash SHA-256 del host difiere del contenedor."
+      }
+    },
+    {
+      "case": 4,
+      "name": "pg_restore con error o archivo corrupto detectado y abortado",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "noSuccessBanner": true,
+        "errorOutput": "pg_restore: error: input file does not appear to be a valid archive (too short?)\n================================================================\n=== VERIFICACION EXPERIMENTAL DE RESTAURACION EN DOCKER AISLADO ===\n================================================================\nArchivo a verificar: "
+      }
+    },
+    {
+      "case": 5,
+      "name": "Dependencias de Supabase (roles anon, authenticated, service_role y auth) verificadas",
+      "passed": true,
+      "details": {
+        "rolesPresent": true
+      }
+    },
+    {
+      "case": 6,
+      "name": "Conteo diferente detectado: rechaza y aborta ante discrepancia de filas",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "mismatchReported": true,
+        "noSuccessBanner": true
+      }
+    },
+    {
+      "case": 7,
+      "name": "Intento de utilizar test_db bloqueado y protegido con error critico",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "accessDenied": true,
+        "testDbRowCountPreserved": true
+      }
+    },
+    {
+      "case": 8,
+      "name": "Base temporal preexistente rechazada para evitar sobreescritura destructiva",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "blockedPreExisting": true
+      }
+    },
+    {
+      "case": 9,
+      "name": "Pre-chequeo de compatibilidad de version PostgreSQL aborta ante incompatibilidad",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "outputSnippet": "[ERROR CRITICO] Incompatibilidad de version: pg_dump (16) es menor que el servidor (17)."
+      }
+    },
+    {
+      "case": 10,
+      "name": "Contrasena ausente de argumentos visibles (uso exclusivo de .pgpass efimero)",
+      "passed": true,
+      "details": {
+        "noPgPasswordInArgs": true,
+        "usesPgPassFile": true
+      }
+    },
+    {
+      "case": 11,
+      "name": "Restauracion completa exitosa: tablas, filas exactas, indices y politicas RLS verificadas",
+      "passed": true,
+      "details": {
+        "exitCode": 0,
+        "successBanner": true,
+        "countsMatched": true
+      }
+    },
+    {
+      "case": 12,
+      "name": "Limpieza completa: sin archivos .pgpass huerfanos ni bases de prueba residuales",
+      "passed": true,
+      "details": {
+        "orphanPgPass": "",
+        "orphanDbs": ""
+      }
+    },
+    {
+      "case": 13,
+      "name": "Conservacion de backup: archivo .dump en host preservado tras errores para analisis forense",
+      "passed": true,
+      "details": {
+        "backupPath": "C:\\Users\\Pininas\\KioscoProX\\admin-tools\\..\\backups\\supabase_backup_20261109_222015.dump",
+        "stillExists": true,
+        "size": 2646416
+      }
+    },
+    {
+      "case": 14,
+      "name": "Escape correcto de contrasena con dos puntos, contrabarras y espacios en .pgpass",
+      "passed": true,
+      "details": {
+        "exitCode": 0,
+        "success": true
+      }
+    },
+    {
+      "case": 15,
+      "name": "Validacion con MinExpectedCounts aprueba piso alcanzado y rechaza piso insuficiente",
+      "passed": true,
+      "details": {
+        "minOkPassed": true,
+        "minFailBlocked": true
+      }
+    },
+    {
+      "case": 16,
+      "name": "Restriccion de version minima: servidores anteriores a PostgreSQL 12 son rechazados",
+      "passed": true,
+      "details": {
+        "exitCode": 1,
+        "outputDetected": "[ERROR CRITICO] Version de servidor no soportada: PostgreSQL 11 es anterior a la version minima soportada (PostgreSQL 12+)."
+      }
+    }
+  ],
+  "allPassed": true
+}

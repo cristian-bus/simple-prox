@@ -1,0 +1,162 @@
+{
+  "timestamp": "2026-11-07T00:05:05.320Z",
+  "environment": "PostgreSQL 17.11 on Alpine Linux (pg_isolated_fase3b)",
+  "database": "test_db",
+  "tests": [
+    {
+      "name": "Vulnerabilidad Heredada: Usuario no-admin modifica evento bajo políticas antiguas",
+      "passed": true,
+      "details": {
+        "legacyUpdateSuccess": true,
+        "currentType": "compromised"
+      }
+    },
+    {
+      "name": "Migración DDL y Funciones aplicada con éxito sobre esquema histórico real",
+      "passed": true,
+      "details": {
+        "ddl": true,
+        "func": true
+      }
+    },
+    {
+      "name": "Limpieza RLS: Políticas heredadas eliminadas sin solapamiento por OR",
+      "passed": true,
+      "details": {
+        "activePolicies": [
+          "campaign_events_admin_select",
+          "campaign_events_service_role"
+        ]
+      }
+    },
+    {
+      "name": "Matriz [anon - SELECT]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [anon - INSERT]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [anon - UPDATE]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [anon - DELETE]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [authenticated no-admin - SELECT]: Permitido por SQL, pero RLS retorna 0 filas",
+      "passed": true,
+      "details": {
+        "success": true,
+        "rowsReturned": "0"
+      }
+    },
+    {
+      "name": "Matriz [authenticated no-admin - INSERT]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [authenticated no-admin - UPDATE]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [authenticated no-admin - DELETE]: Bloqueado con error 42501 (Permission Denied)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [admin activo - SELECT]: Acceso autorizado por RLS (ve filas reales)",
+      "passed": true,
+      "details": {
+        "success": true,
+        "rowsReturned": "1"
+      }
+    },
+    {
+      "name": "Matriz [admin activo - INSERT]: Bloqueado (Inmutabilidad de telemetría sin canal directo)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [admin activo - UPDATE]: Bloqueado (Inmutabilidad de telemetría sin canal directo)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [admin activo - DELETE]: Bloqueado (Inmutabilidad de telemetría sin canal directo)",
+      "passed": true,
+      "details": {
+        "stderr": "ERROR:  permission denied for table campaign_events"
+      }
+    },
+    {
+      "name": "Matriz [service_role - SELECT]: Acceso total concedido",
+      "passed": true,
+      "details": {
+        "success": true,
+        "rowsReturned": "1"
+      }
+    },
+    {
+      "name": "Matriz [service_role - INSERT]: Autorizado (simulando ingesta terminal-sync)",
+      "passed": true,
+      "details": {
+        "success": true
+      }
+    },
+    {
+      "name": "Matriz [service_role - UPDATE]: Autorizado (simulando consolidación de lote)",
+      "passed": true,
+      "details": {
+        "success": true
+      }
+    },
+    {
+      "name": "Matriz [service_role - DELETE]: Autorizado (simulando purga rotativa)",
+      "passed": true,
+      "details": {
+        "success": true
+      }
+    },
+    {
+      "name": "Panel Admin: Acceso legítimo a v_campaign_combined_metrics y v_campaign_totals",
+      "passed": true,
+      "details": {
+        "output": "BEGIN\nSET\n16cb0a7e-db5b-442a-8ee4-bf4f44b2aee2\nauthenticated\n1\n1\nCOMMIT"
+      }
+    },
+    {
+      "name": "Panel Admin Seguridad: No-Admin ve 0 filas en v_campaign_combined_metrics vía RLS",
+      "passed": true,
+      "details": {
+        "rowsReturned": "0"
+      }
+    }
+  ]
+}

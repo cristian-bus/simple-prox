@@ -1,0 +1,110 @@
+[
+  {
+    "id": 1,
+    "name": "Consolidación repetida sin duplicar",
+    "procedure": "Inserción de 500 eventos sintéticos y doble ejecución consecutiva de consolidate_campaign_events_batch()",
+    "expected": "Primera corrida procesa 500 eventos; segunda corrida procesa 0 eventos; total agregado permanece en 500",
+    "actual": "Insertados: 500 | Corrida 1: procesó 500, suma=500 | Corrida 2: procesó 0, suma=500",
+    "pass": "PASS",
+    "evidence": "{\n  \"rawInEvents\": 500,\n  \"res1\": {\n    \"success\": true,\n    \"processed\": 500,\n    \"duration_ms\": 16\n  },\n  \"res2\": {\n    \"message\": \"NO_PENDING_EVENTS\",\n    \"success\": true,\n    \"processed\": 0\n  },\n  \"countAfterFirst\": 500,\n  \"countAfterSecond\": 500\n}"
+  },
+  {
+    "id": 2,
+    "name": "Dos consolidadores concurrentes",
+    "procedure": "Worker A adquiere advisory xact lock durante 3s; Worker B intenta consolidar en paralelo; Worker C ejecuta tras liberar",
+    "expected": "Worker B es rechazado de inmediato con LOCKED_BY_ANOTHER_TRANSACTION; Worker C procesa las 50 filas",
+    "actual": "Worker B: LOCKED_BY_ANOTHER_TRANSACTION | Worker C: procesó 50",
+    "pass": "PASS",
+    "evidence": "{\n  \"resB\": {\n    \"reason\": \"LOCKED_BY_ANOTHER_TRANSACTION\",\n    \"success\": false,\n    \"processed\": 0\n  },\n  \"resC\": {\n    \"success\": true,\n    \"processed\": 50,\n    \"duration_ms\": 10\n  }\n}"
+  },
+  {
+    "id": 3,
+    "name": "Consolidación y purga simultáneas",
+    "procedure": "Consolidación de eventos recientes ejecutándose en paralelo con la purga de eventos antiguos verificados",
+    "expected": "Ambos procesos completan sin bloqueos de deadlock ni interferencia mutua",
+    "actual": "Consolidación: 100 procesados | Purga: 100 eliminados",
+    "pass": "PASS",
+    "evidence": "{\n  \"resCons\": {\n    \"success\": true,\n    \"processed\": 100,\n    \"duration_ms\": 10\n  },\n  \"resPurge\": {\n    \"mode\": \"REAL_PURGE\",\n    \"success\": true,\n    \"cutoff_date\": \"2026-10-27\",\n    \"deleted_count\": 100,\n    \"verified_partitions\": 1\n  }\n}"
+  },
+  {
+    "id": 4,
+    "name": "Error durante la consolidación con rollback",
+    "procedure": "Forzado de RAISE EXCEPTION durante la transacción de actualización de agregados",
+    "expected": "Rollback completo: contadores no se alteran y el evento permanece sin marcar (aggregated_at IS NULL)",
+    "actual": "Error capturado: true | Agregados antes: 500, después: 500 | Estado evento: NULL",
+    "pass": "PASS",
+    "evidence": "{\"aggBefore\":500,\"aggAfter\":500,\"evtStatus\":\"NULL\",\"errorMessage\":\"Command failed: docker exec -i pg_isolated_fase3b psql -U test_user -d test_db -v ON_ERROR_STOP=1 -t -A\\nERROR:  SIMULATED_TRANSACTION_FAILURE\\nCONTEXT:  PL/pgSQL function inline_code_block line 5 at RAISE\\n\"}"
+  },
+  {
+    "id": 5,
+    "name": "Error durante la purga con rollback",
+    "procedure": "Intento de purga habiendo un evento anterior al corte sin consolidar (aggregated_at IS NULL)",
+    "expected": "La función aborta con excepción y ninguna fila es eliminada del buffer crudo",
+    "actual": "Purga falló como se esperaba: true | Filas preservadas: evt-p5-1=1, evt-p5-2=1",
+    "pass": "PASS",
+    "evidence": "{\"purgeFailed\":true,\"rowExists1\":\"1\",\"rowExists2\":\"1\",\"errorMessage\":\"Command failed: docker exec -i pg_isolated_fase3b psql -U test_user -d test_db -v ON_ERROR_STOP=1 -t -A\\nERROR:  PURGA_CANCELADA: Existen 1 eventos anteriores o iguales a 2026-10-22 aÃºn sin consolidar.\\nCONTEXT:  PL/pgSQL function purge_campaign_events_safe(integer,integer,boolean,text) line 18 at RAISE\\n\"}"
+  },
+  {
+    "id": 6,
+    "name": "Eventos legítimos con 20 días de atraso",
+    "procedure": "Llegada de 40 eventos generados el 2026-10-15 (hace más de 20 días) por un kiosco reconectado",
+    "expected": "Los eventos son aceptados y consolidados en la fecha histórica correspondiente sin ser descartados",
+    "actual": "Consolidación exitosa: 40 procesados | Agregado fecha 2026-10-15: 40 impresiones",
+    "pass": "PASS",
+    "evidence": "{\"resCons\":{\"success\":true,\"processed\":40,\"duration_ms\":8},\"aggCount\":40}"
+  },
+  {
+    "id": 7,
+    "name": "Reenvío post-purga tras pérdida de ACK HTTP",
+    "procedure": "Evento consolidado y purgado es retransmitido por el cliente debido a respuesta HTTP perdida",
+    "expected": "Comprobar comportamiento del motor de base de datos sin tombstones",
+    "actual": "Fila borrada tras purga: true | Fila reingresó al retransmitirse: true (Comprueba experimentalmente que se requiere salvaguarda o ventana R > W)",
+    "pass": "PASS",
+    "evidence": "{\"rawExistsBefore\":\"0\",\"rawExistsAfter\":\"1\",\"observacion\":\"Valida experimentalmente la necesidad de la ventana temporal\"}"
+  },
+  {
+    "id": 8,
+    "name": "Reenvío desde Dead Letter dentro del buffer",
+    "procedure": "Reenvío manual de un evento que ya está en campaign_events dentro de la ventana de retención",
+    "expected": "ON CONFLICT ignora el duplicado, no se crean filas repetidas y la consolidación no incrementa métricas",
+    "actual": "Conteo filas antes=1, después=1 | Agregados no se duplicaron: antes=1, después=1",
+    "pass": "PASS",
+    "evidence": "{\"countBeforeReplay\":1,\"countAfterReplay\":1,\"aggBefore\":1,\"aggAfter\":1,\"resCons\":{\"message\":\"NO_PENDING_EVENTS\",\"success\":true,\"processed\":0}}"
+  },
+  {
+    "id": 9,
+    "name": "Múltiples purgas sucesivas con conciliación universal",
+    "procedure": "Dos ejecuciones consecutivas de purga sobre bloques temporales distintos y validación de C_agg + P_total == A_total",
+    "expected": "Ambas purgas completan y la identidad matemática de integridad se cumple al 100%",
+    "actual": "Purga 1: 50 del | Purga 2: 50 del | C_agg(702) + P_total(241) = 943 == A_total(943) -> true",
+    "pass": "PASS",
+    "evidence": "{\"purge1\":{\"mode\":\"REAL_PURGE\",\"success\":true,\"cutoff_date\":\"2026-10-25\",\"deleted_count\":50,\"verified_partitions\":1},\"purge2\":{\"mode\":\"REAL_PURGE\",\"success\":true,\"cutoff_date\":\"2026-10-26\",\"deleted_count\":50,\"verified_partitions\":1},\"cAgg\":702,\"pTotal\":241,\"aTotal\":943,\"equationHolds\":true}"
+  },
+  {
+    "id": 10,
+    "name": "Acceso no autorizado a funciones administrativas",
+    "procedure": "Invocación de consolidate_campaign_events_batch() y purge_campaign_events_safe() con rol anon_test_user sin permisos",
+    "expected": "PostgreSQL deniega el acceso con ERROR: permission denied en ambas funciones",
+    "actual": "Consolidación denegada: true | Purga denegada: true",
+    "pass": "PASS",
+    "evidence": "{\"consDenied\":true,\"purgeDenied\":true}"
+  },
+  {
+    "id": 11,
+    "name": "Medición física de 100.000 eventos sintéticos",
+    "procedure": "Generación de 100.000 tuplas sintéticas, medición de Heap e Índices, y consolidación por lotes de 50.000",
+    "expected": "Medición verificable de bytes reales, tiempos de inserción y consolidación sin saturar recursos",
+    "actual": "Insert: 2696ms | Consolidación: 3273ms (100000 evs) | Tabla: 25 MB (Heap: 11 MB, Índices: 15 MB) | Agregados: 136 kB | DB Total: 47 MB",
+    "pass": "PASS",
+    "evidence": "{\n  \"sizeBeforeCons\": {\n    \"total_size\": \"25 MB\",\n    \"heap_size\": \"11 MB\",\n    \"indexes_size\": \"15 MB\",\n    \"total_bytes\": 26337280,\n    \"heap_bytes\": 11018240,\n    \"indexes_bytes\": 15278080,\n    \"db_size\": \"33 MB\",\n    \"db_bytes\": 34346675\n  },\n  \"sizeAfterCons\": {\n    \"campaign_events_total\": \"39 MB\",\n    \"campaign_daily_aggregates_total\": \"136 kB\",\n    \"db_total\": \"47 MB\",\n    \"db_bytes\": 49264307\n  },\n  \"durationInsertMs\": 2696,\n  \"durationConsMs\": 3273\n}"
+  },
+  {
+    "id": 12,
+    "name": "Medición de espacio: DELETE, VACUUM y Reutilización de páginas",
+    "procedure": "Purga de 50.000 eventos, medición de dead tuples, ejecución de VACUUM y reinserción de 20.000 tuplas en páginas recicladas",
+    "expected": "Comprobar comportamiento del Free Space Map y estabilización de disco",
+    "actual": "Purga: 50000 filas en 987ms | Pre-Delete: 39 MB -> Post-Delete: 39 MB -> Post-VACUUM: 39 MB -> Post-Reuse(20k): 41 MB",
+    "pass": "PASS",
+    "evidence": "{\n  \"sizePreDelete\": {\n    \"total_size\": \"39 MB\",\n    \"heap_bytes\": 22708224,\n    \"total_bytes\": 41181184\n  },\n  \"sizePostDeletePreVacuum\": {\n    \"total_size\": \"39 MB\",\n    \"heap_bytes\": 22708224,\n    \"total_bytes\": 41181184\n  },\n  \"sizePostVacuum\": {\n    \"total_size\": \"39 MB\",\n    \"heap_bytes\": 22708224,\n    \"total_bytes\": 41205760\n  },\n  \"sizePostReuse\": {\n    \"total_size\": \"41 MB\",\n    \"heap_bytes\": 22708224,\n    \"total_bytes\": 43278336\n  },\n  \"durationPurgeMs\": 987\n}"
+  }
+]

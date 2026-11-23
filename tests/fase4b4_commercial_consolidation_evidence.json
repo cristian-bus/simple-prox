@@ -1,0 +1,123 @@
+{
+  "timestamp": "2026-11-10T01:55:53.044Z",
+  "backupFile": "C:\\Users\\Pininas\\KioscoProX\\backups\\supabase_backup_20261109_215247.dump",
+  "environment": "PostgreSQL 17.11 on Alpine Linux (Docker pg_isolated_fase3b)",
+  "totalChecks": 10,
+  "passedChecks": 10,
+  "checks": [
+    {
+      "step": 1,
+      "name": "Conservacion de todos los eventos originales tras aplicar DDL (9.787)",
+      "passed": true,
+      "details": {
+        "rawCountBefore": 9787,
+        "rawCountAfterDdl": 9787
+      }
+    },
+    {
+      "step": 2,
+      "name": "Backfill exitoso: 9.787 procesados, 0 pendientes, todos marcados aggregated_at",
+      "passed": true,
+      "details": {
+        "consolidateResult": {
+          "success": true,
+          "processed": 9787,
+          "duration_ms": 367
+        },
+        "pendingAfter": 0,
+        "aggregatedAfter": 9787
+      }
+    },
+    {
+      "step": 3,
+      "name": "Total de impresiones conservado con exactitud matematica (9544)",
+      "passed": true,
+      "details": {
+        "rawImpressionsBefore": 9544,
+        "aggImpressions": 9544
+      }
+    },
+    {
+      "step": 4,
+      "name": "Total de interacciones y clics conservado (aperturas: 149, clics: 94)",
+      "passed": true,
+      "details": {
+        "rawOfferOpensBefore": 149,
+        "aggOfferOpens": 149,
+        "rawWhatsappClicksBefore": 94,
+        "aggWhatsappClicks": 94
+      }
+    },
+    {
+      "step": 5,
+      "name": "Conciliacion FULL OUTER JOIN: Cero discrepancias, 100% de buckets coinciden",
+      "passed": true,
+      "details": {
+        "mismatchesCount": 0,
+        "totalBuckets": 545,
+        "totalSumAgg": 9787,
+        "expected": 9787
+      }
+    },
+    {
+      "step": 6,
+      "name": "Idempotencia: Ejecucion repetida no duplica estadisticas (procesados: 0, total 9.787)",
+      "passed": true,
+      "details": {
+        "secondRun": {
+          "message": "NO_PENDING_EVENTS",
+          "success": true,
+          "processed": 0
+        },
+        "totalSumAfterRepeat": 9787
+      }
+    },
+    {
+      "step": 7,
+      "name": "Comprobacion de eventos con campaign_id NULL (total detectado: 0)",
+      "passed": true,
+      "details": {
+        "nullCampaignEvents": 0
+      }
+    },
+    {
+      "step": 8,
+      "name": "Eventos tardios: Vista unificada computa pendiente y consolidado sin duplicar",
+      "passed": true,
+      "details": {
+        "expectedLateTotal": 9545,
+        "viewImpBeforeConsolidate": 9545,
+        "lateConsolidate": {
+          "success": true,
+          "processed": 1,
+          "duration_ms": 20
+        },
+        "viewImpAfterConsolidate": 9545
+      }
+    },
+    {
+      "step": 9,
+      "name": "Cuotas diarias: v_campaign_daily_quotas opera sin conflictos",
+      "passed": true,
+      "details": {
+        "quotasRows": 21
+      }
+    },
+    {
+      "step": 10,
+      "name": "Seguridad: RLS activo en todas las tablas y politicas definitivas configuradas",
+      "passed": true,
+      "details": {
+        "rlsEvents": true,
+        "rlsAggs": true,
+        "rlsLedger": true,
+        "rlsAudit": true,
+        "policies": [
+          "campaign_events_admin_select",
+          "campaign_events_service_role"
+        ]
+      }
+    }
+  ],
+  "allPassed": true
+}

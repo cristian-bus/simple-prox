@@ -1,0 +1,217 @@
+{
+  "timestamp": "2026-11-07T00:05:18.764Z",
+  "environment": "PostgreSQL 17.11 on Alpine Linux (pg_isolated_fase3b)",
+  "database": "test_db",
+  "user": "test_user",
+  "tests": [
+    {
+      "name": "Prueba 1: Instalación Limpia y Reejecución Idempotente",
+      "passed": true,
+      "details": {
+        "first_run_aggregates": true,
+        "first_run_functions": true,
+        "idempotent_aggregates": true,
+        "idempotent_functions": true,
+        "error": ""
+      }
+    },
+    {
+      "name": "Prueba 2: Backfill Sintético de 10.000 Eventos",
+      "passed": true,
+      "details": {
+        "backfillExec": {
+          "success": true,
+          "processed": 10000,
+          "duration_ms": 198
+        },
+        "unaggregatedRemaining": 0,
+        "aggregatesTotalSum": 10000
+      }
+    },
+    {
+      "name": "Prueba 3: Consolidación Repetida Sin Duplicación",
+      "passed": true,
+      "details": {
+        "repeatConsolidate": {
+          "message": "NO_PENDING_EVENTS",
+          "success": true,
+          "processed": 0
+        },
+        "aggregatesTotalAfterRepeat": 10000
+      }
+    },
+    {
+      "name": "Prueba 4: Conciliación 4D Inicial al 100%",
+      "passed": true,
+      "details": {
+        "all_matching": true,
+        "discrepancies": [],
+        "perfect_matches": 240,
+        "mismatches_count": 0,
+        "total_partitions_checked": 240
+      }
+    },
+    {
+      "name": "Prueba 5: Purga Desactivada por Defecto (Dry-Run)",
+      "passed": true,
+      "details": {
+        "dryRunPurge": {
+          "mode": "DRY_RUN",
+          "message": "SIMULACIÓN EXITOSA: La purga real está desactivada. Ningún registro fue eliminado.",
+          "success": true,
+          "cutoff_date": "2026-11-01",
+          "eligible_rows": 6083,
+          "verified_partitions": 152
+        },
+        "rawCountAfterDryRun": 10000
+      }
+    },
+    {
+      "name": "Prueba 6: Purga Real con Auditoría y Conciliación Inmune",
+      "passed": true,
+      "details": {
+        "realPurge1": {
+          "mode": "REAL_PURGE",
+          "success": true,
+          "cutoff_date": "2026-11-01",
+          "duration_ms": 71,
+          "deleted_count": 6083,
+          "purge_batch_id": "e8db018c-a674-466a-9b2e-8dac8aea9690"
+        },
+        "rawRemaining1": 3917,
+        "ledgerCount1": 6083,
+        "reconPostPurge1": {
+          "all_matching": true,
+          "discrepancies": [],
+          "perfect_matches": 240,
+          "mismatches_count": 0,
+          "total_partitions_checked": 240
+        }
+      }
+    },
+    {
+      "name": "Prueba 7: Integración y Conciliación de Eventos Atrasados",
+      "passed": true,
+      "details": {
+        "lateConsolidation": {
+          "success": true,
+          "processed": 150,
+          "duration_ms": 18
+        },
+        "aggregatesTotalAfterLate": 10150,
+        "reconPostLate": {
+          "all_matching": true,
+          "discrepancies": [],
+          "perfect_matches": 312,
+          "mismatches_count": 0,
+          "total_partitions_checked": 312
+        }
+      }
+    },
+    {
+      "name": "Prueba 8: Segunda Purga y Conservación Matemática de Integridad",
+      "passed": true,
+      "details": {
+        "realPurge2": {
+          "mode": "REAL_PURGE",
+          "success": true,
+          "cutoff_date": "2026-11-01",
+          "duration_ms": 23,
+          "deleted_count": 150,
+          "purge_batch_id": "629cbdb8-cc83-49f7-82ed-3caddbdaeb3d"
+        },
+        "rawRemaining2": 3917,
+        "ledgerCount2": 6233,
+        "reconPostPurge2": {
+          "all_matching": true,
+          "discrepancies": [],
+          "perfect_matches": 312,
+          "mismatches_count": 0,
+          "total_partitions_checked": 312
+        }
+      }
+    },
+    {
+      "name": "Prueba 9: Detección Bidireccional de Inconsistencias y Cancelación de Purga",
+      "passed": true,
+      "details": {
+        "anomaly_detected": true,
+        "mismatches_count": 1,
+        "purge_aborted_message": "ERROR:  PURGA_CANCELADA: Discrepancia detectada en conciliación 4D previa. Detalle: [{\"status\": \"COUNT_MISMATCH\", \"accounted\": 14, \"aggregated\": 1013, \"event_date\": \"2026-10-27\", \"event_type\": \"offer_open\", \"campaign_id\": \"camp-1\", \"merchant_id\": \"merch-1\"}]\nCONTEXT:  PL/pgSQL function public.purge_campaign_events_safe(integer,integer,boolean,text) line 46 at RAISE"
+      }
+    },
+    {
+      "name": "Prueba 10: Exclusión Mutua Concurrente entre Consolidadores",
+      "passed": true,
+      "details": {
+        "reason": "LOCKED_BY_ANOTHER_TRANSACTION",
+        "success": false,
+        "processed": 0
+      }
+    },
+    {
+      "name": "Prueba 11: Integridad de Vistas v_campaign_totals y v_campaign_combined_metrics",
+      "passed": true,
+      "details": {
+        "total_campaign_types": 15,
+        "combinedSum": 10150
+      }
+    },
+    {
+      "name": "Prueba 13: Consulta de Vistas como Administrador Activo (Acceso Autorizado)",
+      "passed": true,
+      "details": {
+        "success": true,
+        "rowsSeen": 312
+      }
+    },
+    {
+      "name": "Prueba 14: Consulta de Vistas como NO Administrador (Bloqueado por RLS = 0 filas)",
+      "passed": true,
+      "details": {
+        "success": true,
+        "rowsSeen": 0
+      }
+    },
+    {
+      "name": "Prueba 15: Acceso Anónimo a Vistas Bloqueado (42501)",
+      "passed": true,
+      "details": {
+        "error": "ERROR:  permission denied for view v_campaign_combined_metrics"
+      }
+    },
+    {
+      "name": "Prueba 16: RPC Reconcile Bloqueado para NO Administrador",
+      "passed": true,
+      "details": {
+        "error": "ERROR:  Acceso denegado: se requieren privilegios administrativos para ejecutar la conciliación.\nCONTEXT:  PL/pgSQL function public.reconcile_campaign_metrics_4d(date,text) line 21 at RAISE"
+      }
+    },
+    {
+      "name": "Prueba 17: RPC Reconcile Permitido para Administrador Activo",
+      "passed": true,
+      "details": {
+        "success": true,
+        "output": "BEGIN\nSET\n16cb0a7e-db5b-442a-8ee4-bf4f44b2aee2\nauthenticated\n{\"all_matching\": true, \"discrepancies\": [], \"perfect_matches\": 312, \"mismatches_count\": 0, \"total_partitions_checked\": 312}\nCOMMIT"
+      }
+    },
+    {
+      "name": "Prueba 18: RPC Consolidate y Purge Prohibidos para Authenticated (Solo service_role)",
+      "passed": true,
+      "details": {
+        "consolidateErr": "ERROR:  permission denied for function consolidate_campaign_events_batch",
+        "purgeErr": "ERROR:  permission denied for function purge_campaign_events_safe"
+      }
+    },
+    {
+      "name": "Prueba 12: Rollback Seguro Preservando Datos Crudos",
+      "passed": true,
+      "details": {
+        "funcRbRes": true,
+        "aggRbRes": true,
+        "remainingEventsAfterRb": 50,
+        "checkTables": "f|f|f"
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "A",
+    "name": "Duplicación Post-Purga (Adversarial)",
+    "procedure": "Simulación de ACK perdido, purga y retransmisión 5 días después. Comparativa sin tombstones vs con deduplicación compacta",
+    "expected": "Demostrar duplicación en Alternativa A y protección en Alternativa B",
+    "actual": "Sin Tombstones: contador duplicado de 1 a 2 (Duplicación confirmada) | Con Tombstones: contador se mantuvo en 1 (Protegido)",
+    "pass": "PASS",
+    "evidence": "{\n  \"countAggAfterFirst\": 1,\n  \"countAggAfterSecond\": 2,\n  \"countAggWithDedup\": 1,\n  \"duplicatedWithoutTombstone\": true,\n  \"protectedWithTombstone\": true\n}"
+  },
+  {
+    "id": "B",
+    "name": "Concurrencia Real e Intercalación Transaccional",
+    "procedure": "Conexión 1 bloquea 100 filas de fecha D-15 con FOR UPDATE; Conexión 2 intenta purgar simultáneamente esa misma fecha",
+    "expected": "PostgreSQL previene eliminación prematura: Purga aborta por tuplas no marcadas; Cero deadlocks; Cero filas eliminadas antes de tiempo",
+    "actual": "Purga abortó con seguridad: true | Filas preservadas intactas: 100/100 | Cero deadlocks",
+    "pass": "PASS",
+    "evidence": "{\"purgeBlockedOrAborted\":true,\"purgeErrorMessage\":\"Command failed: docker exec -i pg_isolated_fase3b psql -U test_user -d test_db -v ON_ERROR_STOP=1 -t -A\\nERROR:  PURGA_CANCELADA: Existen 100 eventos anteriores o iguales a 2026-10-27 aÃºn sin consolidar.\\nCONTEXT:  PL/pgSQL function purge_campaign_events_safe(integer,integer,boolean,text) line 18 at RAISE\\n\",\"remainingRows\":100,\"aggTotal\":0}"
+  },
+  {
+    "id": "C",
+    "name": "Conciliación por Dimensiones Granulares",
+    "procedure": "Auditoría cruzada en las 4 dimensiones (campaign_id, event_date, merchant_id, event_type) tras consolidaciones y purgas",
+    "expected": "Todas las particiones individuales coinciden al 100% (raw == agg) sin compensaciones ocultas",
+    "actual": "Particiones auditadas: 20 | Coincidencia exacta: true | Discrepancias: 0",
+    "pass": "PASS",
+    "evidence": "{\n  \"total_partitions_checked\": 20,\n  \"all_matching\": true,\n  \"mismatches_count\": 0\n}"
+  },
+  {
+    "id": "D",
+    "name": "Topes Diarios (v_campaign_daily_quotas)",
+    "procedure": "Validación de cupos: 30 imps hoy, llegada de 200 imps atrasadas, alcance de límite (50), consolidación y purgas",
+    "expected": "Impresiones de hoy calculadas exactamente; eventos pasados no alteran el cupo; purgas no afectan el día en curso",
+    "actual": "Paso 1 (30 imps): 30/50 (agotado: false) | Paso 2 (+200 viejas): 30/50 (inmune) | Paso 3 (+20 hoy): 50/50 (agotado: true) | Paso 4 (post-purga): 50/50",
+    "pass": "PASS",
+    "evidence": "{\n  \"q1\": {\n    \"impressions_today\": 30,\n    \"daily_limit\": 50,\n    \"is_quota_exhausted\": false\n  },\n  \"q2\": {\n    \"impressions_today\": 30,\n    \"is_quota_exhausted\": false\n  },\n  \"q3\": {\n    \"impressions_today\": 50,\n    \"is_quota_exhausted\": true\n  },\n  \"q4\": {\n    \"impressions_today\": 50,\n    \"is_quota_exhausted\": true\n  }\n}"
+  },
+  {
+    "id": "E",
+    "name": "Medición de Almacenamiento de Deduplicación Compacta",
+    "procedure": "Medición física en PostgreSQL 17 de purged_event_dedup con 10.000, 50.000 y 100.000 identificadores",
+    "expected": "Medición exacta de Heap, Índices PK B-Tree y bytes reales por identificador",
+    "actual": "10k IDs: 1432 kB (146.6 B/id) | 50k IDs: 6944 kB (142.2 B/id) | 100k IDs: 13 MB (138.8 B/id - Heap: 5888 kB, Índices: 7632 kB)",
+    "pass": "PASS",
+    "evidence": "{\n  \"size10k\": {\n    \"count\": 10000,\n    \"total_size\": \"1432 kB\",\n    \"heap_size\": \"592 kB\",\n    \"indexes_size\": \"808 kB\",\n    \"total_bytes\": 1466368,\n    \"bytes_per_row\": 146.6\n  },\n  \"size50k\": {\n    \"count\": 50000,\n    \"total_size\": \"6944 kB\",\n    \"heap_size\": \"2944 kB\",\n    \"indexes_size\": \"3968 kB\",\n    \"total_bytes\": 7110656,\n    \"bytes_per_row\": 142.2\n  },\n  \"size100k\": {\n    \"count\": 100000,\n    \"total_size\": \"13 MB\",\n    \"heap_size\": \"5888 kB\",\n    \"indexes_size\": \"7632 kB\",\n    \"total_bytes\": 13877248,\n    \"bytes_per_row\": 138.8\n  }\n}"
+  }
+]
